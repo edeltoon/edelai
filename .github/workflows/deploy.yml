@@ -1,0 +1,46 @@
+# main에 머지될 때마다 GitHub Pages로 자동 배포 → https://edeltoon.github.io/edelai/
+# 사전 설정:
+#   1) 레포가 Public이어야 함 (무료 organization에서 Private 레포는 Pages 불가)
+#   2) 저장소 Settings → Pages → Build and deployment → Source: "GitHub Actions"
+# next.config.ts의 output: 'export' 덕분에 npm run build 결과가 out/ 폴더에 정적 파일로 나온다
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
