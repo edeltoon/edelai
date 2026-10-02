@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AppShell, SpaceTitleBar } from '@/components/shell';
+import { ProfessorShell } from './ProfessorShell';
 import { sampleCards } from './sample-cards';
 import type { ReviewCard } from '@/types/professor-cards';
 import { GenerateCardsForm } from './GenerateCardsForm';
@@ -29,28 +29,7 @@ export function CardReview() {
   }
 
   return (
-    <AppShell
-      header={{ spaceName: 'AI 교수 공간', role: 'professor', userName: '담당 교수' }}
-      sidebar={{
-        sections: [
-          { key: 'courses', title: '나의 담당 과목', items: [
-            { key: 'phil', label: '서양철학:쟁점과토론', href: '/professor/course/phil/cards', active: true, icon: 'course' },
-          ] },
-          { key: 'tools', title: '과목 관리', items: [
-            { key: 'cards', label: '오류 카드 검토', href: '/professor/course/phil/cards', active: true },
-            { key: 'records', label: '학생 기록', disabled: true, disabledHint: '학생 제출 API 연결 후 제공' },
-          ] },
-        ],
-        user: { name: '담당 교수', caption: '교수 · 화면 미리보기', initial: '교' },
-      }}
-    >
-      <SpaceTitleBar title="서양철학:쟁점과토론">
-        <nav aria-label="교수 과목 메뉴" className="flex flex-wrap gap-1 text-body">
-          <span aria-disabled="true" className="px-3 py-2 text-ink-sub" title="준비 중">수업 분석</span>
-          <span aria-current="page" className="rounded-control bg-sejong-soft px-3 py-2 font-semibold text-sejong">챌린지 관리</span>
-          <span aria-disabled="true" className="px-3 py-2 text-ink-sub" title="준비 중">학생 기록</span>
-        </nav>
-      </SpaceTitleBar>
+    <ProfessorShell active="cards">
       <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -117,7 +96,7 @@ export function CardReview() {
           )}
         </div>
       </div>
-    </AppShell>
+    </ProfessorShell>
   );
 }
 
