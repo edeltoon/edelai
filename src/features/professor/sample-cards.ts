@@ -1,10 +1,4 @@
-import type { ErrorCard } from '@/types/content';
-
-export type ReviewCard = ErrorCard & {
-  title: string;
-  evidence: string;
-  rejectionReason?: string;
-};
+import type { ReviewCard } from '@/types/professor-cards';
 
 // 화면 검토용 예시. 실제 강의자료 및 교수 검수를 거친 배포 데이터가 아닙니다.
 export const sampleCards: ReviewCard[] = [

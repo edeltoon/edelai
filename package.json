@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:api": "node --experimental-strip-types --conditions=react-server --test tests/chat.test.ts"
+    "test:api": "node --experimental-strip-types --conditions=react-server --test tests/*.test.ts"
   },
   "dependencies": {
     "next": "16.3.8",

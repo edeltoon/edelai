@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { AppShell, SpaceTitleBar } from '@/components/shell';
-import { sampleCards, type ReviewCard } from './sample-cards';
+import { sampleCards } from './sample-cards';
+import type { ReviewCard } from '@/types/professor-cards';
+import { GenerateCardsForm } from './GenerateCardsForm';
 
 type Status = ReviewCard['approvalStatus'];
 const labels: Record<Status, string> = { pending: '검토 대기', approved: '승인', rejected: '반려' };
@@ -22,7 +24,7 @@ export function CardReview() {
 
   function update(card: ReviewCard) {
     setCards(current => current.map(item => item.id === card.id ? card : item));
-    setNotice(card.approvalStatus === 'approved' ? '샘플 카드를 승인했습니다. 학생에게 배포되지는 않습니다.'
+    setNotice(card.approvalStatus === 'approved' ? '카드를 승인했습니다. 현재 화면에만 반영되며 학생에게 배포되지는 않습니다.'
       : card.approvalStatus === 'rejected' ? '반려 사유를 기록했습니다.' : '수정 내용을 반영하고 검토 대기로 변경했습니다.');
   }
 
@@ -56,14 +58,18 @@ export function CardReview() {
             <p className="mt-2 text-body text-ink-sub">오류 주장과 정답 근거를 확인하고 챌린지에 사용할 카드를 검토하세요.</p>
           </div>
           <button className={secondary} onClick={() => {
-            if (window.confirm('이 화면의 검토 내용을 지우고 샘플 카드로 되돌릴까요?')) {
+            if (window.confirm('AI가 생성한 카드와 검토 내용을 지우고 샘플 카드로 되돌릴까요?')) {
               setCards(sampleCards); setFilter('all'); setSelected(sampleCards[0].id); setNotice('샘플 카드를 초기화했습니다.');
             }
-          }}>샘플 초기화</button>
+          }}>샘플로 초기화</button>
         </div>
         <p className="mt-5 rounded-block border border-line bg-subtle px-4 py-3 text-caption text-ink-sub">
-          화면 미리보기입니다. 샘플 카드로 검토하며, 변경은 새로고침하면 초기화됩니다. 실제 강의자료 업로드·AI 카드 생성·학생 배포는 아직 연결되지 않았습니다.
+          Claude 생성 카드와 샘플 카드를 구분해 표시합니다. 생성·검토 결과는 새로고침하면 초기화됩니다. 서버 저장과 학생 배포는 아직 연결되지 않았습니다.
         </p>
+        <GenerateCardsForm onGenerated={generated => {
+          setCards(current => [...generated, ...current]); setFilter('all'); setSelected(generated[0].id);
+          setNotice('생성된 카드를 검토 대기 목록에 추가했습니다.');
+        }} />
         <div role="status" aria-live="polite" className="mt-3 min-h-6 text-caption text-correct">{notice}</div>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           {(['pending', 'approved', 'rejected'] as const).map(status => (
@@ -78,9 +84,9 @@ export function CardReview() {
           <aside className="space-y-6" aria-label="강의자료와 오류 카드 목록">
             <section className="rounded-block border border-line p-4">
               <h3 className="text-lead font-semibold">강의자료</h3>
-              <p className="mt-2 text-caption text-ink-sub">실제 자료를 연결하면 원문 근거와 카드 내용을 대조할 수 있습니다.</p>
-              <button disabled className={`${secondary} mt-4 w-full`}>강의자료 연결 준비 중</button>
-              <div className="mt-4 border-t border-line-soft pt-3 text-caption text-ink-sub">현재 근거: 설계안의 철학 예시<br />실제 강의자료가 아닙니다.</div>
+              <p className="mt-2 text-caption text-ink-sub">위 입력창에서 강의 내용을 전달하고 카드의 원문 인용과 정답을 대조하세요.</p>
+              <button disabled className={`${secondary} mt-4 w-full`}>PDF 업로드 준비 중</button>
+              <div className="mt-4 border-t border-line-soft pt-3 text-caption text-ink-sub">{active?.source === 'claude' ? `입력 자료: ${active.sourceTitle}` : '샘플 근거: 설계안의 철학 예시 (실제 강의자료 아님)'}</div>
             </section>
             <section>
               <div className="mb-3 flex items-center justify-between">
@@ -93,7 +99,7 @@ export function CardReview() {
                     <button onClick={() => { setSelected(card.id); setNotice(''); }} aria-pressed={active?.id === card.id}
                       className={`w-full rounded-block border p-4 text-left ${active?.id === card.id ? 'border-sejong bg-sejong-soft' : 'border-line bg-page hover:bg-subtle'}`}>
                       <div className="flex items-center justify-between gap-2 text-caption"><span className="text-ink-sub">카드 {String(index + 1).padStart(2, '0')}</span><StatusBadge status={card.approvalStatus} /></div>
-                      <p className="mt-3 text-body font-semibold">{card.title}</p>
+                      <p className="mt-3 text-body font-semibold">{card.title}</p><p className="mt-1 text-caption text-info">{card.source === 'claude' ? 'Claude 생성' : '샘플 카드'}</p>
                       <p className="mt-1 text-caption text-ink-sub">{card.errorType} · 난이도 {card.difficulty}</p>
                     </button>
                   </li>
@@ -129,11 +135,12 @@ function ReviewPanel({ card, onUpdate }: { card: ReviewCard; onUpdate: (card: Re
   return (
     <section aria-label="선택한 오류 카드 상세" className="min-w-0 rounded-block border border-line bg-page">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft p-5 sm:p-6">
-        <div><p className="text-caption text-ink-sub">서양철학 · 검토용 샘플</p><h3 className="mt-1 text-title font-bold">{card.title}</h3></div>
+        <div><p className="text-caption text-ink-sub">서양철학 · {card.source === 'claude' ? 'Claude 생성 초안' : '검토용 샘플'}</p><h3 className="mt-1 text-title font-bold">{card.title}</h3></div>
         <StatusBadge status={card.approvalStatus} />
       </div>
       <div className="space-y-6 p-5 sm:p-6">
         <div className="flex flex-wrap gap-2 text-caption"><span className="rounded-control bg-subtle px-3 py-1">{card.errorType}</span><span className="rounded-control bg-subtle px-3 py-1">난이도 {card.difficulty}</span><span className="rounded-control bg-info-soft px-3 py-1 text-info">{card.approvalStatus === 'pending' ? '교수 검토 필요' : '교수 검토 완료'}</span></div>
+        {card.sourceExcerpt && <ReadingBlock title={`입력 원문 · ${card.sourceTitle}`} text={card.sourceExcerpt} color="bg-subtle text-ink" />}
         {editing ? (
           <div className="space-y-4">
             {(['wrongClaim', 'correctClaim', 'evidence'] as const).map(field => (
@@ -160,15 +167,15 @@ function ReviewPanel({ card, onUpdate }: { card: ReviewCard; onUpdate: (card: Re
       </div>
       {!editing && <div className="border-t border-line bg-subtle p-5 sm:p-6">
         {card.approvalStatus === 'pending' ? <>
-          <label className="flex items-start gap-3 text-body"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} className="mt-1 size-4 shrink-0 accent-sejong" /><span>샘플의 오류 주장, 정답 설명, 검토 근거를 확인했습니다.</span></label>
+          <label className="flex items-start gap-3 text-body"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} className="mt-1 size-4 shrink-0 accent-sejong" /><span>오류 주장, 정답 설명, 검토 근거를 확인했습니다.</span></label>
           {rejecting && <label className="mt-4 block text-body font-semibold">반려 사유 <span className="text-caption font-normal text-ink-sub">필수</span><textarea autoFocus rows={3} maxLength={1000} className={`${inputClass} mt-2 font-normal`} value={reason} onChange={event => setReason(event.target.value)} placeholder="어떤 내용을 다시 검토해야 하는지 적어 주세요." /></label>}
           <div className="mt-5 flex flex-wrap justify-end gap-2">
             {rejecting ? <><button className={secondary} onClick={() => setRejecting(false)}>반려 취소</button><button disabled={!reason.trim()} className={secondary} onClick={() => onUpdate({ ...card, approvalStatus: 'rejected', rejectionReason: reason.trim() })}>반려 사유 저장</button></> : <>
               <button className={secondary} onClick={() => setRejecting(true)}>반려하기</button>
-              <button disabled={!reviewed} className="rounded-control bg-sejong px-5 py-2 text-body font-semibold text-(--color-page) disabled:cursor-not-allowed disabled:opacity-40" onClick={() => onUpdate({ ...card, approvalStatus: 'approved', approvedBy: 'preview-professor' })}>샘플 카드 승인하기</button>
+              <button disabled={!reviewed} className="rounded-control bg-sejong px-5 py-2 text-body font-semibold text-(--color-page) disabled:cursor-not-allowed disabled:opacity-40" onClick={() => onUpdate({ ...card, approvalStatus: 'approved', approvedBy: 'preview-professor' })}>카드 승인하기</button>
             </>}
           </div>
-        </> : <div className="flex flex-wrap items-center justify-between gap-4"><p className="text-body text-ink-sub">{card.approvalStatus === 'approved' ? '검토를 마친 샘플 카드입니다. 아직 배포되지 않았습니다.' : '반려된 카드입니다. 내용을 수정하면 다시 검토할 수 있습니다.'}</p><button className={secondary} onClick={() => onUpdate({ ...card, approvalStatus: 'pending', approvedBy: undefined, rejectionReason: undefined })}>다시 검토하기</button></div>}
+        </> : <div className="flex flex-wrap items-center justify-between gap-4"><p className="text-body text-ink-sub">{card.approvalStatus === 'approved' ? '검토를 마친 카드입니다. 아직 서버에 저장되거나 배포되지 않았습니다.' : '반려된 카드입니다. 내용을 수정하면 다시 검토할 수 있습니다.'}</p><button className={secondary} onClick={() => onUpdate({ ...card, approvalStatus: 'pending', approvedBy: undefined, rejectionReason: undefined })}>다시 검토하기</button></div>}
       </div>}
     </section>
   );
