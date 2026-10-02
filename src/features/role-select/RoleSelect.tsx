@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Wordmark } from '@/components/shell';
-import { DEMO_ACCOUNTS, HOME_PATH, SESSION_CHANGE_EVENT, SESSION_KEY, parseSession, startSession } from '@/lib/session';
+import { DEMO_ACCOUNTS, HOME_PATH, getSessionSnapshot, parseSession, startSession, subscribeSession } from '@/lib/session';
 import type { Role } from '@/types/session';
 
 const ROLE_LABEL: Record<Role, string> = { student: '학생', professor: '교수' };
@@ -27,29 +27,11 @@ const OPTIONS: { role: Role; title: string; account: string; scope: string }[] =
   },
 ];
 
-function subscribe(onChange: () => void) {
-  window.addEventListener('storage', onChange);
-  window.addEventListener(SESSION_CHANGE_EVENT, onChange);
-  return () => {
-    window.removeEventListener('storage', onChange);
-    window.removeEventListener(SESSION_CHANGE_EVENT, onChange);
-  };
-}
-
-/** 원문 문자열을 스냅샷으로 써서 값이 같으면 다시 렌더하지 않는다 */
-function getRawSession() {
-  try {
-    return window.localStorage.getItem(SESSION_KEY);
-  } catch {
-    return null;
-  }
-}
-
 export function RoleSelect() {
   const router = useRouter();
   const [pending, setPending] = useState<Role | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const raw = useSyncExternalStore(subscribe, getRawSession, () => null);
+  const raw = useSyncExternalStore(subscribeSession, getSessionSnapshot, () => null);
   const current = parseSession(raw);
 
   // "이동하고 있어요"가 남지 않게 원래 문구로 되돌리는 경우:

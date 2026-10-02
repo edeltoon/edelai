@@ -51,6 +51,28 @@ export function readSession(): Session | null {
   }
 }
 
+/** useSyncExternalStore용 구독: 같은 탭(SESSION_CHANGE_EVENT)과 다른 탭(storage) 변경 */
+export function subscribeSession(onChange: () => void): () => void {
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === null || e.key === SESSION_KEY) onChange();
+  };
+  window.addEventListener('storage', onStorage);
+  window.addEventListener(SESSION_CHANGE_EVENT, onChange);
+  return () => {
+    window.removeEventListener('storage', onStorage);
+    window.removeEventListener(SESSION_CHANGE_EVENT, onChange);
+  };
+}
+
+/** useSyncExternalStore용 스냅샷: 저장 문자열 그대로 (같은 값이면 다시 렌더하지 않음) */
+export function getSessionSnapshot(): string | null {
+  try {
+    return window.localStorage.getItem(SESSION_KEY);
+  } catch {
+    return null;
+  }
+}
+
 /** 역할을 고르면 해당 가상 계정으로 세션을 만든다 */
 export function startSession(role: Role): Session {
   const session: Session = { ...DEMO_ACCOUNTS[role], signedInAt: new Date().toISOString() };
