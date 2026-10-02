@@ -1,4 +1,7 @@
-# main에 머지될 때마다 GitHub Pages로 자동 배포 → https://edeltoon.github.io/edelai/
+# LLM API 라우트 사용으로 정적 Pages 배포 보류, 배포처 확정 후 수정
+# (현재 next.config.ts의 output: 'export'가 꺼져 있어 이 워크플로는 out/을 만들지 못한다. 자동 실행 중지, 수동 실행만 가능)
+#
+# 원래 용도: main에 머지될 때마다 GitHub Pages로 자동 배포 → https://edeltoon.github.io/edelai/
 # 사전 설정:
 #   1) 레포가 Public이어야 함 (무료 organization에서 Private 레포는 Pages 불가)
 #   2) 저장소 Settings → Pages → Build and deployment → Source: "GitHub Actions"
@@ -6,8 +9,6 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
