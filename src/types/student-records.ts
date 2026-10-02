@@ -108,6 +108,8 @@ export interface ChallengeSubmission {
   directAnswerFlag: boolean;
   /** 이유 칸 중 붙여넣기로만 채워진 비율 0~1 */
   pastedRatio: number;
+  /** 오탐 수: 맞는 주장을 '틀리다'로 판정한 주장 개수 (그 주장의 이유 점수는 0) */
+  falseAlarms: number;
   score: ScoreBreakdown;
   /** 확신도 보정 정확도 0~100 */
   calibration: number;

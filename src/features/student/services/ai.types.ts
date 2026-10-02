@@ -84,6 +84,8 @@ export interface SubmitChallengeRequest {
  * 서버 채점 규칙 (src/lib 순수 함수를 그대로 쓰면 학생 화면 mock과 결과가 같다):
  * - 판정 정오: 규칙 기반. 오류 주장이면 'wrong', 아니면 'correct'가 정답.
  * - 본인 생각 0~2, 올바른 개념 0~2: AI 평가 (Claude). 실패 시 오류로 응답하고 키워드 점수로 조용히 대체하지 않는다.
+ *   단, 맞는 주장을 '틀리다'로 판정한 오탐 주장의 본인 생각 점수는 0 (scoring.claimReasoningScore).
+ *   오탐 수는 submission.falseAlarms (scoring.countFalseAlarms).
  * - 근거 0/2: 선택한 evidenceId === 오류 카드 evidenceId (규칙).
  * - 합계: scoring.judgmentPoint / reasoningPoint / errorClaimPoint / processPenalty / totalScore.
  * - 확신도 보정: calibration.calibrationAccuracy.

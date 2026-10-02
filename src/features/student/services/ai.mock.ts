@@ -4,7 +4,16 @@
 import { calibrationAccuracy } from '@/lib/calibration';
 import { inputProgress } from '@/lib/challengeInput';
 import { evidenceScore, keywordConceptScore, keywordReasonScore, pastedReasonRatio } from '@/lib/reasoning';
-import { errorClaimPoint, judgmentPoint, processPenalty, reasoningPoint, totalScore } from '@/lib/scoring';
+import {
+  claimReasoningScore,
+  countFalseAlarms,
+  errorClaimPoint,
+  isFalseAlarm,
+  judgmentPoint,
+  processPenalty,
+  reasoningPoint,
+  totalScore,
+} from '@/lib/scoring';
 import { retrievalDate } from '@/lib/schedule';
 import { RECORD_SCHEMA_VERSION, type ClaimGrade, type ErrorReveal } from '@/types/student-records';
 import { getChallengePublic } from '../content/challenges';
@@ -57,15 +66,17 @@ export async function submitChallengeMock(
     const k = key.claims.find((c) => c.claimId === answer.claimId);
     if (!k) return fail('CHALLENGE_KEY_MISMATCH', '채점 기준을 찾을 수 없어요.');
     const truth = k.isError ? 'wrong' : 'correct';
-    const reasoningScore = keywordReasonScore(answer.reasoning, key.reasonKeywords);
+    const falseAlarm = isFalseAlarm(k.isError, answer.judgment);
+    const reasoningScore = claimReasoningScore(keywordReasonScore(answer.reasoning, key.reasonKeywords), k.isError, answer.judgment);
     claimGrades.push({
       claimId: answer.claimId,
       isError: k.isError,
       judgmentCorrect: answer.judgment === truth,
       reasoningScore,
       explanation: k.explanation,
-      feedback:
-        reasoningScore === 2
+      feedback: falseAlarm
+        ? '맞는 주장을 틀리다고 판정해서 이 주장의 이유 점수는 0이에요. 맞는 주장을 맞다고 인정하는 것도 실력이에요.'
+        : reasoningScore === 2
           ? '수업 개념을 들어 판단 이유를 설명했어요.'
           : reasoningScore === 1
             ? '이유는 썼지만 수업 개념과의 연결이 약해요.'
@@ -121,6 +132,7 @@ export async function submitChallengeMock(
       answers,
       directAnswerFlag: req.directAnswerFlag,
       pastedRatio,
+      falseAlarms: countFalseAlarms(claimGrades.map((g, i) => ({ isError: g.isError, judgment: answers[i].judgment }))),
       score,
       calibration,
       claimGrades,
