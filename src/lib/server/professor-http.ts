@@ -1,16 +1,16 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import { AUTH_COOKIE, verifyAccess } from './auth';
+import { isSameOrigin } from './origin';
 import { DbError } from '@/lib/db/client';
 import { ProfessorInputError } from './professor-validation';
 export function json(data: unknown, status=200) { return Response.json(data,{status,headers:{'Cache-Control':'no-store'}}); }
 export async function gate(request: Request) {
   const session=await verifyAccess((await cookies()).get(AUTH_COOKIE)?.value);
   if(session?.role!=='professor' || session.userId!=='p1')return json({ok:false,error:{message:'담당 교수 계정으로 로그인해 주세요.'}},403);
-  const url=new URL(request.url);
-  // 현재 시연 과목은 p1 담당. 다중 과목 권한 모델 도입 전 로컬 시연으로 제한.
-  if (process.env.PROFESSOR_DB_ENABLED!=='true' || !['localhost','127.0.0.1','[::1]'].includes(url.hostname)) return json({ok:false,error:{message:'교수 DB 기능은 로컬 서버에서 PROFESSOR_DB_ENABLED=true 설정 후 사용할 수 있습니다.'}},403);
-  if (request.method!=='GET' && request.headers.get('origin')!==url.origin) return json({ok:false,error:{message:'요청 출처를 확인해 주세요.'}},403);
+  // 현재 시연 과목은 p1 담당. 교수 역할 확인(proxy + 위 세션 확인)은 그대로 두고, 배포 환경에서도 PROFESSOR_DB_ENABLED=true일 때만 연다.
+  if (process.env.PROFESSOR_DB_ENABLED!=='true') return json({ok:false,error:{message:'교수 DB 기능은 서버에 PROFESSOR_DB_ENABLED=true를 설정한 뒤 사용할 수 있습니다.'}},403);
+  if (request.method!=='GET' && !isSameOrigin(request.headers)) return json({ok:false,error:{message:'요청 출처를 확인해 주세요.'}},403);
 }
 export async function body(request:Request):Promise<unknown> {
   if (!request.headers.get('content-type')?.startsWith('application/json')) throw new ProfessorInputError('JSON 요청이 필요합니다.');
