@@ -1,13 +1,6 @@
 // 챌린지·결과 화면 표시용 작은 도우미 (점수 계산은 하지 않는다. 계산은 src/lib)
 import type { ApiError } from '../services/store.types';
 
-/** '2026-10-09T…' → '10/09' */
-export function monthDay(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
-}
-
 export type LoadProblem =
   | { kind: 'not_approved' }
   | { kind: 'login'; message: string }

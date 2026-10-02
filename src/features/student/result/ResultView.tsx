@@ -10,7 +10,8 @@ import type { ChallengePublic } from '../services/store.types';
 import { studentStore } from '../services/store';
 import { studentRoutes } from '../routes';
 import { useStudent } from '../StudentSession';
-import { monthDay, pointText, problemOf, type LoadProblem } from '../challenge/display';
+import { seoulDateLabel } from '@/lib/schedule';
+import { pointText, problemOf, type LoadProblem } from '../challenge/display';
 import { PrimaryLink, SecondaryButton, SecondaryLink, StateNotice } from '../challenge/StateNotice';
 
 type Load =
@@ -203,7 +204,7 @@ function ResultBody({ courseId, challenge, initial }: { courseId: string; challe
         )}
 
         <p className="mt-6 rounded-block bg-correct-bg px-5 py-3 text-body text-correct">
-          1주 뒤 재인출 퀴즈 예약 · {monthDay(submission.retrievalScheduledAt)}
+          1주 뒤 재인출 퀴즈 · {seoulDateLabel(submission.retrievalScheduledAt)} 예약
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
           <SecondaryLink href={studentRoutes.challenges(courseId)}>챌린지 목록</SecondaryLink>

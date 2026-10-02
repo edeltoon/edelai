@@ -5,6 +5,7 @@ import {
   isContentlessReason, keywordConceptScore, keywordReasonGrade, ruleReasonFeedback,
 } from "../src/lib/reasoning.ts";
 import { averageScore, reasoningPoint } from "../src/lib/scoring.ts";
+import { retrievalDate, seoulDateLabel } from "../src/lib/schedule.ts";
 import type { ClaimAnswer } from "../src/types/student-records.ts";
 
 const kw = ["이데아", "실재", "모방", "감각", "본질", "동굴", "그림자", "인식", "불완전"];
@@ -81,4 +82,13 @@ test("average shown on the result screen matches the rounded reasoning point", (
   assert.equal(averageScore([2, 2, 0]).toFixed(1), "1.3");
   assert.equal(reasoningPoint([2, 2, 0]), 1);
   assert.equal(averageScore([2, 2, 2]), 2);
+});
+
+test("retrieval date is labeled in Asia/Seoul regardless of the runtime time zone", () => {
+  // 10/3 15:30 UTC = 한국 10/4 00:30 제출 → 7일 뒤 한국 10/11(일)
+  const scheduled = retrievalDate("2026-10-03T15:30:00.000Z");
+  assert.equal(scheduled, "2026-10-10T15:30:00.000Z");
+  assert.equal(seoulDateLabel(scheduled), "10월 11일(일)");
+  assert.equal(seoulDateLabel("2026-10-10T03:00:00.000Z"), "10월 10일(토)");
+  assert.equal(seoulDateLabel("not-a-date"), "");
 });
