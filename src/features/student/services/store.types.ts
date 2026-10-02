@@ -171,8 +171,8 @@ export interface SubmitChallengeRequest {
  * 서버가 채점하고 저장한 뒤 제출 기록 전체를 돌려준다(이때 처음으로 정답·해설 포함).
  * 채점 규칙(src/lib 순수 함수를 그대로 쓰면 학생 화면 local 모드와 결과가 같다):
  * - 판정 정오(규칙): 오류 주장이면 'wrong', 아니면 'correct'가 정답
- * - 본인 생각 0~2, 올바른 개념 0~2: AI 평가(Claude). AI 채점이 실패해도 제출 전체를 실패시키지 않는다.
- *   규칙 기반 점수(판정·근거·과정 감점)는 저장하고, 실패한 AI 항목만 null + pendingReview에 넣어 "교수 채점 대기"로 둔다.
+ * - 본인 생각 0~2, 올바른 개념 0~2: AI 평가(Claude, 교수 정답 설명 기준). AI 채점이 실패·시간 초과되면
+ *   제출을 실패시키지 않고 키워드 규칙 점수로 대체한다. submission.gradingMethod와 응답 grading으로 표시한다.
  *   (키워드 점수로 조용히 대체하지 않는다)
  *   단, 오탐(맞는 주장을 '틀리다')인 주장의 본인 생각 점수는 0 (scoring.claimReasoningScore)
  * - 근거 0/2(규칙): evidenceId === 오류 카드 evidenceId
@@ -181,7 +181,14 @@ export interface SubmitChallengeRequest {
  * - 재인출 예약: schedule.retrievalDate(submittedAt)
  * - submission.grader = 'server'
  */
-export type SubmitChallengeResponse = { ok: true; submission: ChallengeSubmission } | ApiError;
+export type SubmitChallengeResponse =
+  | {
+      ok: true;
+      submission: ChallengeSubmission;
+      /** 서버 채점 정보. method가 keyword면 fallbackReason에 Claude 실패 사유 (local mock 응답에는 없음) */
+      grading?: { method: 'claude' | 'keyword'; fallbackReason?: string; model?: string };
+    }
+  | ApiError;
 
 /* ── 2-3. PATCH /api/student/submissions/{submissionId} ── */
 
