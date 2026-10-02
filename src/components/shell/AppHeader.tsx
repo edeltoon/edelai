@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { Role } from '@/types/session';
 import { RoleBadge } from './RoleBadge';
 import { MenuIcon } from './icons';
+import { Wordmark } from './Wordmark';
 
 export interface AppHeaderProps {
   /** 예: "AI 학습 공간", "AI 교수 공간" */
@@ -12,24 +13,6 @@ export interface AppHeaderProps {
   actions?: ReactNode;
   /** 모바일에서 사이드바 드로어를 여는 버튼 */
   onOpenMenu?: () => void;
-}
-
-/** 교표 자리 워드마크. 공식 교표 이미지는 쓰지 않는다 */
-function Wordmark() {
-  return (
-    <div className="flex items-center gap-2.5">
-      <span
-        aria-hidden
-        className="flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-sejong"
-      >
-        <span className="size-4 rounded-full bg-sejong" />
-      </span>
-      <span className="flex flex-col leading-none">
-        <span className="text-title font-bold tracking-tight text-ink">세종대학교</span>
-        <span className="mt-0.5 text-[10px] font-semibold tracking-wider text-ink">SEJONG UNIVERSITY</span>
-      </span>
-    </div>
-  );
 }
 
 export function AppHeader({ spaceName, role, userName, actions, onOpenMenu }: AppHeaderProps) {
