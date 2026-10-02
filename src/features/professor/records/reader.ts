@@ -4,13 +4,14 @@ import type { ClaimAnswer, ScoreBreakdown } from '../../../types/student-records
 
 export type ReviewScore = Omit<ScoreBreakdown, 'reasoning' | 'concept'> & { reasoning: number | null; concept: number | null };
 export type SubmissionView = {
+  originalScore?: ReviewScore; professorComment?: string | null; finalizedAt?: string | null; updatedAt?: string;
   id: string; challengeId: string; submittedAt: string; score: ReviewScore;
   calibration: number; answers: ClaimAnswer[]; beforeSummary: string; afterExplanation?: string;
   claimResults?: { claimId: string; judgmentCorrect: boolean }[];
   grader: 'mock' | 'server' | 'unknown';
 };
 export type ConversationView = { id: string; title: string; messages: { id: string; role: 'user' | 'ai' | 'notice'; text: string }[] };
-export type StudentView = { id: string; submissions: SubmissionView[]; conversations: ConversationView[] };
+export type StudentView = { id: string; name?: string; memberNo?: string; submissions: SubmissionView[]; conversations: ConversationView[] };
 export type RecordsSnapshot = { students: StudentView[]; warnings: string[] };
 const obj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const str = (v: unknown): v is string => typeof v === 'string';

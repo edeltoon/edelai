@@ -98,3 +98,7 @@ import { listErrorCards, approveErrorCard, listSubmissions, DbError } from '@/li
   ```
   카드만 되돌리려면 `0002_seed.sql`을 다시 실행해도 됩니다.
 - 학생 화면이 `NEXT_PUBLIC_STORE_MODE=local`이면 DB와 상관없이 브라우저 기록만 지웁니다(헤더 "시연 리셋").
+
+## 교수 연결 확인 (2026-10-03)
+
+`professor_score`, `professor_comment`, `finalized_*` 계약을 실제 저장·조회로 확인했습니다. 확정은 점수와 함께 한 번의 UPDATE로 저장하고 `updated_at`으로 동시 변경을 검사합니다. 세부 API와 제한은 [교수 DB 연결](PROFESSOR_DB.md)을 참고하세요.

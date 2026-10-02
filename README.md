@@ -84,3 +84,7 @@ Next.js Route Handlers (`src/app/api/`)로 Claude 호출을 처리합니다.
 첫 화면은 Supabase Auth 로그인입니다. 기존 역할 선택만으로는 교수 화면에 들어갈 수 없습니다.
 계정 생성, 서버 환경 변수 및 세션 제한은 [로그인 설정](docs/AUTH.md)을 참고하세요.
 실제 Auth 계정과 학번·교번 매핑을 준비해야 로그인할 수 있습니다.
+
+## 교수 Supabase 연결
+
+카드 저장·승인·반려, 학생 제출 조회·통계, 교수 검토 저장·평가 확정은 [교수 DB 연결](docs/PROFESSOR_DB.md)을 참고하세요. 로컬 `.env.local`에 `PROFESSOR_DB_ENABLED=true`를 설정하고 교수 계정으로 로그인합니다.

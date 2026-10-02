@@ -4,7 +4,7 @@ import type { Session } from '../../types/session.ts';
 export const AUTH_COOKIE = 'setask-access';
 type Env = Record<string, string | undefined>;
 export function authConfig(env: Env = process.env) {
-  const url = env.SUPABASE_URL?.trim();
+  const url = env.SUPABASE_URL?.trim().replace(/\/+$/, '');
   const key = env.SUPABASE_PUBLISHABLE_KEY?.trim();
   if (!url || !/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url) || !key) return null;
   return { url, key };
