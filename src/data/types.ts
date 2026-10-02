@@ -1,6 +1,6 @@
 // 공용 데이터 타입. 필드 이름을 바꿀 때는 학생·교수·데이터 담당 모두에게 먼저 확인한다.
 // 1) 콘텐츠 타입: mock-data 스킬 스키마
-// 2) 세션 타입: 로그인 담당과 공유 (localStorage `edeltoon:session`)
+// 2) 세션 타입: 확정. 역할 선택 화면이 저장 (localStorage `edeltoon:session`)
 // 3) 학생 기록 타입: 학생 화면이 저장하고 교수 화면이 읽는다 (키 목록은 docs/STUDENT_RECORDS.md)
 
 /* ───────────── 1. 콘텐츠 ───────────── */
@@ -65,7 +65,10 @@ export interface Challenge {
 
 /* ───────────── 2. 세션 ───────────── */
 
-/** localStorage `edeltoon:session`. 실제 인증 없음, 가상 정보만 */
+/**
+ * localStorage `edeltoon:session` (확정). 역할 선택 화면이 저장하고 학생·교수 화면이 읽는다.
+ * 실제 인증 없음, 가상 정보만. 형태를 바꾸면 팀원(교수 화면·서버 API 담당)에게 공유한다.
+ */
 export interface Session {
   role: Role;
   /** 학생: s1~s5, 교수: p1 */
