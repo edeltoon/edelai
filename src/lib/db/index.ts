@@ -14,5 +14,6 @@ export * from './errorCards';
 export * from './challenges';
 export * from './submissions';
 export * from './students';
+export { DEMO_ERROR_CARD_IDS, resetDemo } from './demo';
 export { checkDbConnection } from './health';
 export type * from './types';

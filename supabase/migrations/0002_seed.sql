@@ -1,5 +1,7 @@
--- SeTask 첫 목표 시드: 학생 s1, 교수 승인 오류 카드 ec-idea-1, 챌린지 ch1(공개 정보 + 서버 전용 정답)
+-- SeTask 첫 목표 시드: 학생 s1, 오류 카드 ec-idea-1(승인 대기), 챌린지 ch1(공개 정보 + 서버 전용 정답)
 -- 실행: 0001_init.sql 다음에 SQL Editor에 붙여넣고 Run. 여러 번 실행해도 같은 상태가 된다(upsert).
+-- 시연: ec-idea-1은 pending으로 시작한다. 교수가 승인해야 학생에게 ch1이 열린다(승인 전에는 학생 API가 409).
+--       다시 실행하면 카드가 pending으로 돌아간다. 학생 기록은 지우지 않는다(시연 리셋은 docs/DATABASE.md).
 -- 내용 출처: 학생 화면 content/challenges.ts, content/lecture.ts, services/mock/answerKey.ts (같은 문장)
 -- TODO(검수 필요): 주장·해설·정답 키워드·근거 쪽수는 철학 내용 검수 전 초안. 실명·실제 학번 아님.
 
@@ -10,7 +12,7 @@ insert into public.students (id, name, member_no, major)
 values ('s1', '김동하', '26011225', '철학과')
 on conflict (id) do update set name = excluded.name, member_no = excluded.member_no, major = excluded.major;
 
--- 교수 승인 오류 카드 (ch1의 주장 B)
+-- 오류 카드 (ch1의 주장 B). 시연에서 교수가 직접 승인하도록 pending으로 시작
 insert into public.error_cards (
   id, course_id, concept_id, title, wrong_claim, correct_claim, correct_keywords,
   evidence_id, evidence, source, error_type, difficulty, approval_status, approved_by, approved_at
@@ -22,7 +24,7 @@ insert into public.error_cards (
   'ev-w3-p12',
   '동굴의 비유에서 동굴 밖의 세계가 이데아에, 벽의 그림자가 감각 세계에 대응한다. 실재와 모방의 관계가 뒤집힌 주장이다.',
   null,
-  '개념 반전', '중', 'approved', 'p1', now()
+  '개념 반전', '중', 'pending', null, null
 )
 on conflict (id) do update set
   course_id = excluded.course_id, concept_id = excluded.concept_id, title = excluded.title,
@@ -30,7 +32,7 @@ on conflict (id) do update set
   correct_keywords = excluded.correct_keywords, evidence_id = excluded.evidence_id,
   evidence = excluded.evidence, error_type = excluded.error_type, difficulty = excluded.difficulty,
   approval_status = excluded.approval_status, approved_by = excluded.approved_by,
-  approved_at = coalesce(public.error_cards.approved_at, excluded.approved_at);
+  approved_at = excluded.approved_at, rejection_reason = null;
 
 -- 챌린지 ch1: 학생에게 공개되는 정보 (오류 위치 없음)
 insert into public.challenges (id, course_id, concept_id, title, question, error_count, public)
