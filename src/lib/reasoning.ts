@@ -54,23 +54,69 @@ export function countKeywordHits(text: string, keywords: readonly string[]): num
   return hits;
 }
 
+/** "모르겠다", "기억이 안 난다"처럼 판단 근거가 없다고 밝히는 표현 */
+const NO_KNOWLEDGE =
+  /모르겠|모르겟|몰라|모름|모릅니다|기억(이|은|도|가)?\s*(안|잘\s*안|나지\s*않|없)|기억\s*안\s*나|생각(이|은)?\s*(안\s*나|나지\s*않)|찍었|찍음|헷갈|확실하지\s*않|알\s*수\s*없/g;
+/** 근거가 아닌 군말·판정 표현. 지우고 남은 글자로 이유에 내용이 있는지 본다 */
+const FILLER =
+  /그냥|아마도?|왠지|느낌(상|으로|이|만)?|감으로|잘(?!못)|것\s*같(다|아요|아서|습니다|음|은데|네요)?|같아요|같다|생각(한다|해요|합니다|함|했다|했어요|됩니다|된다)|(맞|틀리|틀렸|맞았)(다|어요|습니다|는|을|은|음|네요)|맞는\s*말|틀린\s*말|입니다|이에요|예요|그렇다|그래서|하지만|그런데|[.,!?…~'"“”‘’()\s]/g;
+
 /**
- * 본인 생각 점수 0~2 (learning-loop-rules 키워드 규칙).
- * 20자 이상(공백 제외) + 개념 키워드 1개 이상 → 2, 20자 이상만 → 1, 그 외 → 0
- * 예) ('', kw) → 0, (19자 + 키워드, kw) → 0, (20자 키워드 없음) → 1, (20자 + '이데아') → 2
+ * 내용 없는 이유인지. "모르겠다"·"기억이 나지 않는다"류 표현을 빼고 남는 내용이 15자 미만이거나,
+ * 군말·판정 표현만으로 채워 남는 내용이 8자 미만이면 true.
+ * 예) '기억이 나지 않는다.' → true, '잘 모르겠지만 그냥 맞는 것 같다고 생각한다.' → true,
+ *     '이데아가 뭔지 기억이 안 난다' → true, '맞다고 생각합니다. 맞는 것 같아요.' → true,
+ *     '그냥 맞는 말 같다. 감각으로 경험한다고 했으니까.' → false,
+ *     '확실하지 않지만 이데아가 실재라고 배워서 감각 세계가 실재라는 말은 틀렸다.' → false
  */
+export function isContentlessReason(text: string): boolean {
+  if (!compact(text)) return true;
+  if (isUnsureWithoutContent(text)) return true;
+  return text.replace(NO_KNOWLEDGE, '').replace(FILLER, '').length < 8;
+}
+
+/**
+ * "모르겠다"·"기억이 안 난다"류 표현이 있고, 그 표현과 군말을 빼면 남는 내용이 15자 미만인지.
+ * 짧은 개념 설명('이데아가 실재다')은 이 표현이 없으므로 false.
+ * 예) '이데아가 실재인지 모르겠다' → true, '이데아가 실재다' → false,
+ *     '확실하지 않지만 이데아가 진정한 실재이고 감각 세계는 그 모방이다' → false
+ */
+export function isUnsureWithoutContent(text: string): boolean {
+  if (!new RegExp(NO_KNOWLEDGE.source).test(text)) return false;
+  return text.replace(NO_KNOWLEDGE, '').replace(FILLER, '').length < 15;
+}
+
+/** 키워드 규칙 본인 생각 점수의 근거 (피드백 문구를 점수와 맞추는 데 쓴다) */
+export type KeywordReasonBasis = 'contentless' | 'short' | 'noKeyword' | 'keyword';
+
+/**
+ * 본인 생각 점수 0~2와 그 근거 (learning-loop-rules 키워드 규칙).
+ * 내용 없는 이유 → 0, 20자 미만(공백 제외) → 0, 20자 이상 + 개념 키워드 1개 이상 → 2, 20자 이상만 → 1
+ * 예) ('', kw) → 0 contentless, (19자 + 키워드) → 0 short, (20자 키워드 없음) → 1 noKeyword,
+ *     (20자 + '이데아') → 2 keyword, ('기억이 나지 않는다. 그래서 잘 모르겠지만 맞는 것 같다', kw) → 0 contentless
+ */
+export function keywordReasonGrade(
+  text: string,
+  conceptKeywords: readonly string[],
+): { score: 0 | 1 | 2; basis: KeywordReasonBasis } {
+  if (isContentlessReason(text)) return { score: 0, basis: 'contentless' };
+  if (compact(text).length < 20) return { score: 0, basis: 'short' };
+  return countKeywordHits(text, conceptKeywords) >= 1 ? { score: 2, basis: 'keyword' } : { score: 1, basis: 'noKeyword' };
+}
+
+/** 본인 생각 점수 0~2만. 예는 keywordReasonGrade 참고 */
 export function keywordReasonScore(text: string, conceptKeywords: readonly string[]): 0 | 1 | 2 {
-  if (compact(text).length < 20) return 0;
-  return countKeywordHits(text, conceptKeywords) >= 1 ? 2 : 1;
+  return keywordReasonGrade(text, conceptKeywords).score;
 }
 
 /**
  * 올바른 개념 제시 점수 0~2. 수정 설명에 오류 카드의 정답 키워드가 몇 개 있는지.
- * 2개 이상 → 2, 1개 → 1, 0개 → 0
- * 예) (undefined, kw) → 0, ('', kw) → 0, ('이데아가 실재', ['이데아','실재']) → 2
+ * 2개 이상 → 2, 1개 → 1, 0개 → 0. "모르겠다"류로 내용 없이 쓴 설명은 키워드가 있어도 0
+ * 예) (undefined, kw) → 0, ('', kw) → 0, ('이데아가 실재', ['이데아','실재']) → 2,
+ *     ('이데아가 실재인지 모르겠다', ['이데아','실재']) → 0
  */
 export function keywordConceptScore(correction: string | undefined, correctKeywords: readonly string[]): 0 | 1 | 2 {
-  if (!correction) return 0;
+  if (!correction || isUnsureWithoutContent(correction)) return 0;
   const hits = countKeywordHits(correction, correctKeywords);
   return hits >= 2 ? 2 : hits === 1 ? 1 : 0;
 }
@@ -113,12 +159,22 @@ export function firstSentenceSummary(text: string, max = 60): string {
 }
 
 /**
- * 키워드 규칙으로 채점했을 때의 본인 생각 피드백 (해요체).
- * 예) (2, false) → 개념 연결 칭찬, (0, false) → 20자·개념 연결 안내, (2, true) → 오탐 안내
+ * 키워드 규칙으로 채점했을 때의 본인 생각 피드백 (해요체). 문구는 점수와 항상 맞춘다.
+ * missedError: 오류 주장을 '맞다'로 판정해 놓친 경우 (점수는 그대로, 놓쳤다는 안내만 덧붙임)
+ * 예) (2, false) → 개념 연결 칭찬, (0, false) → 20자·개념 연결 안내, (2, true) → 오탐 안내,
+ *     (0, false, {basis:'contentless'}) → 근거 없는 이유 0점 안내, (2, false, {missedError:true}) → 개념은 들었지만 오류를 놓침
  */
-export function ruleReasonFeedback(score: number, falseAlarm: boolean): string {
+export function ruleReasonFeedback(
+  score: number,
+  falseAlarm: boolean,
+  options: { basis?: KeywordReasonBasis; missedError?: boolean } = {},
+): string {
   if (falseAlarm) return '맞는 주장을 틀리다고 판정해서 이 주장의 이유 점수는 0이에요. 맞는 주장을 맞다고 인정하는 것도 실력이에요.';
-  if (score >= 2) return '수업 개념을 들어 판단 이유를 설명했어요.';
-  if (score === 1) return '이유는 썼지만 수업 개념과의 연결이 약해요.';
-  return '이유를 20자 이상, 수업 개념과 연결해 써 보세요.';
+  const missed = options.missedError ? ' 이 주장의 오류는 놓쳤어요. 해설과 비교해 보세요.' : '';
+  if (options.basis === 'contentless' && score === 0) {
+    return `‘모르겠다’, ‘기억이 안 난다’처럼 판단 근거가 없는 이유는 0점이에요. 무엇을 보고 그렇게 판단했는지 적어 보세요.${missed}`;
+  }
+  if (score >= 2) return options.missedError ? `수업 개념을 들어 이유를 썼어요.${missed}` : '수업 개념을 들어 판단 이유를 설명했어요.';
+  if (score === 1) return `이유는 썼지만 수업 개념과의 연결이 약해요.${missed}`;
+  return `이유가 짧거나 수업 개념과 연결되지 않아 0점이에요. 20자 이상, 수업 개념과 연결해 써 보세요.${missed}`;
 }

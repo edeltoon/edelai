@@ -15,7 +15,7 @@ import {
   evidenceScore,
   firstSentenceSummary,
   keywordConceptScore,
-  keywordReasonScore,
+  keywordReasonGrade,
   pastedReasonRatio,
   ruleReasonFeedback,
 } from './reasoning.ts';
@@ -88,10 +88,13 @@ export function keywordItemGrades(
   const reasoning: Record<string, ItemScore> = {};
   for (const answer of answers) {
     const claim = claims.find((c) => c.claimId === answer.claimId);
-    const score = keywordReasonScore(answer.reasoning, reasonKeywords);
+    const { score, basis } = keywordReasonGrade(answer.reasoning, reasonKeywords);
     reasoning[answer.claimId] = {
       score,
-      feedback: ruleReasonFeedback(score, claim ? isFalseAlarm(claim.isError, answer.judgment) : false),
+      feedback: ruleReasonFeedback(score, claim ? isFalseAlarm(claim.isError, answer.judgment) : false, {
+        basis,
+        missedError: claim?.isError === true && answer.judgment === 'correct',
+      }),
     };
   }
   const concept: Record<string, ItemScore> = {};

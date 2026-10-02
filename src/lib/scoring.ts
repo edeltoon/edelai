@@ -10,10 +10,18 @@ import type { ScoreBreakdown } from '@/types/student-records';
 export const MAX_SCORE = 7;
 export const PROCESS_PENALTY = -2;
 
+/**
+ * 주장별 점수의 평균 (반올림 전). 화면에서 "평균 1.3 → 반올림 1"처럼 계산 과정을 보여줄 때 쓴다.
+ * 예) [] → 0, [2, 2, 0] → 1.333…, [2, 2, 2] → 2
+ */
+export function averageScore(values: readonly number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
 function averageRounded(values: readonly number[], max: number): number {
   if (values.length === 0) return 0;
-  const avg = values.reduce((a, b) => a + b, 0) / values.length;
-  return Math.min(max, Math.max(0, Math.round(avg)));
+  return Math.min(max, Math.max(0, Math.round(averageScore(values))));
 }
 
 /**
