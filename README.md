@@ -1,7 +1,7 @@
 # EdelAI
 
 AI 오류 검증 기반 대학 학습 평가 플랫폼을 위한 해커톤 프로젝트입니다.
-현재는 개발 환경, 기본 실행 확인용 페이지, 서버의 Claude 대화 API가 준비되어 있습니다.
+현재는 공통 셸, 교수 카드 검토 화면, Claude 대화·오류 카드 생성 API가 준비되어 있습니다.
 
 개발 목표는 **Claude API를 실제 호출하는 학습·평가 서비스**입니다.
 학생 질문은 Next.js 서버 API를 통해 Claude에 전달합니다.
@@ -17,7 +17,7 @@ AI 오류 검증 기반 대학 학습 평가 플랫폼을 위한 해커톤 프�
 - npm
 - `src/` 디렉터리 구조
 
-`POST /api/chat`으로 Claude를 호출합니다. 제품 화면, 데이터베이스, 인증, 강의자료 검색은 아직 없습니다.
+`POST /api/chat`으로 일반 학습 대화를, `POST /api/professor/cards/generate`로 강의 텍스트 기반 오류 카드 생성을 처리합니다. 데이터베이스, 인증, 강의자료 검색은 아직 없습니다.
 추가 UI 라이브러리 없이 기존 기술 구성으로 개발합니다.
 
 ## 사전 준비
@@ -40,6 +40,9 @@ npm run dev
 기본 페이지는 키 없이 실행되며, AI 응답을 받으려면 `.env.example`을 참고해
 서버 전용 `ANTHROPIC_API_KEY`와 `ANTHROPIC_MODEL`을 `.env.local`에 설정합니다.
 키는 브라우저 코드나 `NEXT_PUBLIC_*` 변수에 넣지 않고 Git에 커밋하지 않습니다.
+교수 화면은 [http://localhost:3000/professor](http://localhost:3000/professor)입니다.
+강의 제목과 텍스트(100~12,000자)를 입력하면 Claude 생성 카드를 수정·승인·반려할 수 있습니다.
+생성·검토 결과는 새로고침하면 사라집니다. PDF 업로드·서버 저장·학생 배포는 아직 연결하지 않았습니다.
 API 사용법과 학생 화면 연결 예시는 [API 문서](docs/API.md)를 참고하세요.
 
 `package-lock.json`을 함께 관리하며, 기존 의존성 설치에는 `npm ci`를 사용합니다.
@@ -66,7 +69,7 @@ src/app/
   page.tsx      # 실행 확인용 기본 페이지
 ```
 
-제품 기획이 확정되면 이 구조를 바탕으로 기능을 추가합니다.
+교수 UI는 `src/features/professor/`, 서버 AI 로직은 `src/lib/server/`에서 관리합니다.
 
 ## 서버 및 배포 방향
 
