@@ -2,8 +2,9 @@
 // 서버 저장소가 정해지면 loadRecords 구현을 조회 API로 교체한다.
 import type { ClaimAnswer, ScoreBreakdown } from '../../../types/student-records.ts';
 
+export type ReviewScore = Omit<ScoreBreakdown, 'reasoning' | 'concept'> & { reasoning: number | null; concept: number | null };
 export type SubmissionView = {
-  id: string; challengeId: string; submittedAt: string; score: ScoreBreakdown;
+  id: string; challengeId: string; submittedAt: string; score: ReviewScore;
   calibration: number; answers: ClaimAnswer[]; beforeSummary: string; afterExplanation?: string;
   claimResults?: { claimId: string; judgmentCorrect: boolean }[];
   grader: 'mock' | 'server' | 'unknown';
@@ -14,8 +15,8 @@ export type RecordsSnapshot = { students: StudentView[]; warnings: string[] };
 const obj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const str = (v: unknown): v is string => typeof v === 'string';
 const number = (v: unknown, min: number, max: number): v is number => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
-function score(v: unknown): v is ScoreBreakdown {
-  return obj(v) && number(v.judgment, 0, 1) && number(v.reasoning, 0, 2) && number(v.concept, 0, 2)
+function score(v: unknown): v is ReviewScore {
+  return obj(v) && number(v.judgment, 0, 1) && (v.reasoning === null || number(v.reasoning, 0, 2)) && (v.concept === null || number(v.concept, 0, 2))
     && number(v.evidence, 0, 2) && (v.penalty === 0 || v.penalty === -2) && number(v.total, 0, 7);
 }
 function answer(v: unknown): v is ClaimAnswer {

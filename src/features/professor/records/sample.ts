@@ -15,3 +15,6 @@ export const sampleStudents: StudentView[] = [{
     { id: 'example-answer', role: 'ai', text: '플라톤은 이데아를 참된 실재로, 감각 세계를 그 불완전한 모방으로 설명합니다. 어떤 쪽이 변하지 않는다고 생각하나요?' },
   ] }],
 }];
+
+// 채점 실패 후 교수 검토 대기 상태의 가상 예시.
+sampleStudents.push({ id: 'example-pending', conversations: [], submissions: [{ ...sampleStudents[0].submissions[0], id: 'example-pending-submission', score: { judgment: 1, reasoning: null, concept: null, evidence: 2, penalty: 0, total: 3 } }] });
