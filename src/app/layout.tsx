@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "세종대학교 AI 학습 공간 (시연용)",
+  title: { default: "Sejong Task | 세종대학교 AI 학습 공간 (시연용)", template: "%s | Sejong Task" },
   description: "AI 오류 검증 기반 대학 학습 평가 플랫폼",
 };
 
