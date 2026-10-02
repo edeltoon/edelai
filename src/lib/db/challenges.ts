@@ -67,17 +67,20 @@ export async function listChallenges(courseId: string): Promise<ChallengePublic[
   return (data as ChallengeRow[]).map(toChallengePublic);
 }
 
+export type GradingChallengeResult =
+  | { status: 'ok'; challenge: ChallengePublic; key: ChallengeAnswerKey; errorCards: ErrorCardRecord[] }
+  | { status: 'not_found' }
+  | { status: 'not_approved' };
+
 /**
  * 채점용 전체 정보 (서버 채점 전용). 공개 정보 + 정답 키 + 오류 카드.
- * 승인되지 않은 카드가 섞여 있으면 null.
+ * 승인되지 않은 카드가 섞여 있으면 'not_approved' (학생 API는 409).
  */
-export async function getChallengeForGrading(
-  challengeId: string,
-): Promise<{ challenge: ChallengePublic; key: ChallengeAnswerKey; errorCards: ErrorCardRecord[] } | null> {
+export async function getChallengeForGrading(challengeId: string): Promise<GradingChallengeResult> {
   const result = await getPublicChallenge(challengeId);
-  if (result.status !== 'ok') return null;
+  if (result.status !== 'ok') return result;
   const key = await loadKey(challengeId);
-  if (!key) return null;
+  if (!key) return { status: 'not_approved' };
   const errorCards = await loadErrorCards(errorCardIds(key));
-  return { challenge: result.challenge, key, errorCards };
+  return { status: 'ok', challenge: result.challenge, key, errorCards };
 }
