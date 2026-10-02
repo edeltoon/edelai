@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { overconfidentClaimIds } from '@/lib/calibration';
+import { averageScore } from '@/lib/scoring';
 import type { ChallengeSubmission } from '@/types/student-records';
 import { getChallengePublic } from '../content/challenges';
 import { getChallenge, saveAfterExplanation } from '../services/ai';
@@ -111,23 +112,18 @@ function ResultBody({ courseId, challenge, initial }: { courseId: string; challe
         <section aria-label="점수" className="rounded-block bg-sejong-soft px-6 py-5">
           <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
             <p className="tabular text-hero font-bold leading-none text-sejong">+{score.total}점</p>
-            <p className="tabular text-body text-sejong">
-              판정 {pointText(score.judgment)} · 이유 {pointText(score.reasoning)}
-              <br />
-              개념 {pointText(score.concept)} · 근거 {pointText(score.evidence)}
-              {score.penalty !== 0 && <> · 과정 {pointText(score.penalty)}</>}
-            </p>
+            <p className="text-body text-sejong">7점 만점 · 아래 항목을 더한 점수예요</p>
             <p className="tabular ml-auto text-caption text-ink-sub">
               확신도 보정 정확도 <span className="text-body font-semibold text-ink">{submission.calibration}</span>/100
             </p>
           </div>
+          <ScoreBreakdownList submission={submission} label={label} />
           <ul className="mt-3 space-y-1 text-caption text-ink-sub">
             {keywordFallback && <li>· AI 채점이 원활하지 않아 이유·개념 점수는 키워드 규칙으로 매겼어요. 교수님이 다시 확인할 수 있어요.</li>}
             {submission.grader === 'mock' && <li>· 시연용 예시 채점이에요(키워드 규칙).</li>}
             {pending.length > 0 && (
               <li>· 교수 채점 대기: {pending.map((p) => (p === 'reasoning' ? '이유' : '개념')).join('·')} 점수는 교수님이 확인한 뒤 확정돼요.</li>
             )}
-            {score.penalty !== 0 && <li>· 정답 직행 요청 뒤 이유를 붙여넣기로 채워 과정 점수가 깎였어요. 교수님이 검토해요.</li>}
             <li>· AI 채점은 보조 지표이며 교수님이 조정할 수 있어요.</li>
           </ul>
         </section>
@@ -145,7 +141,7 @@ function ResultBody({ courseId, challenge, initial }: { courseId: string; challe
             <p className="mt-2 text-caption text-ink-sub">근거: {r.evidenceLabel}</p>
             {r.conceptFeedback && (
               <p className="mt-2 text-body text-ink-sub">
-                내 개념 설명 {pointText(r.conceptScore)} · {r.conceptFeedback}
+                내 개념 설명 {outOfTwo(r.conceptScore)} · {r.conceptFeedback}
               </p>
             )}
           </section>
@@ -157,6 +153,7 @@ function ResultBody({ courseId, challenge, initial }: { courseId: string; challe
         {/* 모든 주장 해설 (해설 필수) */}
         <section className="mt-8" aria-label="주장별 해설">
           <h2 className="text-lead font-bold text-ink">주장별 해설</h2>
+          <p className="mt-1 text-caption text-ink-sub">주장마다 이유 점수(0~2)를 매기고, 세 주장의 평균을 반올림한 값이 위 합계의 ‘이유’ 점수예요.</p>
           {submission.falseAlarms > 0 && (
             <p className="mt-1 text-body text-ink-sub">맞는 주장을 맞다고 인정하는 것도 실력이에요. 오탐한 주장은 이유 점수가 0점이에요.</p>
           )}
@@ -186,8 +183,8 @@ function ResultBody({ courseId, challenge, initial }: { courseId: string; challe
                   </p>
                   <p className="mt-2 text-body text-ink">{g.explanation}</p>
                   <p className="mt-2 text-caption text-ink-sub">
-                    내 이유 {pointText(g.reasoningScore)}
-                    {g.scoredBy === 'keyword' && submission.grader === 'server' ? ' (키워드 규칙)' : ''}: “{answer?.reasoning}”
+                    이 주장의 이유 점수 {outOfTwo(g.reasoningScore)}
+                    {g.scoredBy === 'keyword' && submission.grader === 'server' ? ' (키워드 규칙)' : ''} · 내 이유: “{answer?.reasoning}”
                   </p>
                   {g.feedback && <p className="mt-1 text-caption text-ink">{g.feedback}</p>}
                 </li>
@@ -214,6 +211,81 @@ function ResultBody({ courseId, challenge, initial }: { courseId: string; challe
         </div>
       </div>
     </div>
+  );
+}
+
+/** 주장 하나의 0~2 점수 표시: 2/2, 대기 */
+function outOfTwo(value: number | null): string {
+  return value === null ? '교수 채점 대기' : `${value}/2`;
+}
+
+/** 평균 표시: 정수면 그대로, 아니면 소수 첫째 자리 (1.333… → 1.3) */
+function averageText(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+/** 합계의 각 항목이 어떻게 나왔는지: 주장별 점수 → 평균 → 반올림을 같은 기준으로 보여 준다 */
+function ScoreBreakdownList({ submission, label }: { submission: ChallengeSubmission; label: (claimId: string) => string }) {
+  const { score, claimGrades, errorReveals } = submission;
+  const correctCount = claimGrades.filter((g) => g.judgmentCorrect).length;
+  const reasoningParts = claimGrades.map((g) => `${label(g.claimId)} ${g.reasoningScore}`).join(' · ');
+  const reasoningAvg = averageScore(claimGrades.map((g) => g.reasoningScore ?? 0));
+  const missed = (claimId: string) => claimGrades.find((g) => g.claimId === claimId)?.judgmentCorrect === false;
+  const errorText = (pick: (r: (typeof errorReveals)[number]) => number | null, ok: string, low: string) => {
+    if (errorReveals.length === 0) return '오류 주장이 없어요.';
+    if (errorReveals.length === 1) {
+      const r = errorReveals[0];
+      const s = pick(r);
+      if (missed(r.claimId)) return `오류 주장 ${label(r.claimId)}를 놓쳐서 0점이에요.`;
+      return `오류 주장 ${label(r.claimId)} ${outOfTwo(s)} · ${s === 2 ? ok : low}`;
+    }
+    const parts = errorReveals.map((r) => `${label(r.claimId)} ${pick(r) ?? '대기'}`).join(' · ');
+    return `오류 주장별 ${parts}, 평균 ${averageText(averageScore(errorReveals.map((r) => pick(r) ?? 0)))}, 반올림해 합계에 반영해요. 놓친 오류 주장은 0점이에요.`;
+  };
+
+  const rows: { name: string; value: number | null; detail: string }[] = [
+    {
+      name: '판정',
+      value: score.judgment,
+      detail:
+        score.judgment === 1
+          ? `주장 ${claimGrades.length}개를 모두 맞게 판정했어요.`
+          : `주장 ${claimGrades.length}개 중 ${correctCount}개만 맞게 판정했어요. 모두 맞아야 1점이에요.`,
+    },
+    {
+      name: '이유',
+      value: score.reasoning,
+      detail:
+        score.reasoning === null
+          ? '교수님이 이유를 채점한 뒤 확정돼요.'
+          : `주장별 이유 점수(각 0~2) ${reasoningParts}, 평균 ${averageText(reasoningAvg)}, 반올림해 ${score.reasoning}점이에요.`,
+    },
+    {
+      name: '개념',
+      value: score.concept,
+      detail:
+        score.concept === null
+          ? '교수님이 개념 설명을 채점한 뒤 확정돼요.'
+          : errorText((r) => r.conceptScore, '바른 개념을 내 말로 설명했어요.', '바른 개념 설명이 부족했어요.'),
+    },
+    {
+      name: '근거',
+      value: score.evidence,
+      detail: errorText((r) => r.evidenceScore, '고른 근거가 강의자료와 일치해요.', '고른 근거가 강의자료와 달라요.'),
+    },
+  ];
+  if (score.penalty !== 0) rows.push({ name: '과정', value: score.penalty, detail: '정답 직행 요청 뒤 이유를 붙여넣기로 채워 감점됐어요. 교수님이 검토해요.' });
+
+  return (
+    <dl className="mt-4 divide-y divide-line border-y border-line">
+      {rows.map((row) => (
+        <div key={row.name} className="grid grid-cols-[3rem_3rem_minmax(0,1fr)] items-baseline gap-x-3 py-2">
+          <dt className="text-body font-semibold text-ink">{row.name}</dt>
+          <dd className="tabular text-body font-semibold text-sejong">{pointText(row.value)}</dd>
+          <dd className="text-caption text-ink-sub">{row.detail}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
