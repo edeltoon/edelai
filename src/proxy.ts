@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AUTH_COOKIE, verifyAccess } from './lib/server/auth';
+import { isSameOrigin } from './lib/server/origin';
 
 export async function proxy(request: NextRequest) {
-  if (request.nextUrl.pathname.startsWith('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(request.method) && request.headers.get('origin') !== request.nextUrl.origin) {
+  if (request.nextUrl.pathname.startsWith('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !isSameOrigin(request.headers)) {
     return NextResponse.json({ ok: false, error: { code: 'INVALID_ORIGIN', message: '요청 출처를 확인해 주세요.' } }, { status: 403 });
   }
   const session = await verifyAccess(request.cookies.get(AUTH_COOKIE)?.value);

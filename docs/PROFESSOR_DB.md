@@ -6,7 +6,7 @@
 - `.env.local`: 기존 Supabase URL/secret key, Auth publishable key/회원 매핑 필요. 실제 값은 커밋하지 않는다.
 - `PROFESSOR_DB_ENABLED=true`를 설정하고 서버 재시작.
 - 서버는 `npm run dev -- --hostname 127.0.0.1`처럼 로컬에 바인딩한다.
-- 교수 DB API는 인증된 교수 `p1`의 `phil` 과목만 지원하고 localhost 주소로 제한한다. 다중 과목·실서비스 배포 전 담당 과목 권한을 확장해야 한다.
+- 교수 DB API는 인증된 교수 `p1`의 `phil` 과목만 지원하고, `PROFESSOR_DB_ENABLED=true`일 때만 열린다(배포 환경 포함, localhost 제한 없음). 다중 과목·실서비스 전 담당 과목 권한을 확장해야 한다.
 - 학생의 `NEXT_PUBLIC_STORE_MODE`는 변경하지 않았다. 학생 API #15는 통합됐으며 학생 화면 연결 후 팀원과 server 모드로 전환한다. local 모드의 제출은 교수 서버 화면에 자동 전송되지 않는다.
 
 ## API

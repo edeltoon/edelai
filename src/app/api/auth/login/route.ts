@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isSameOrigin } from '@/lib/server/origin';
 import { AUTH_COOKIE, authenticateMember } from '@/lib/server/auth';
 
 export async function POST(request: NextRequest) {
-  if (request.headers.get('origin') !== request.nextUrl.origin) return NextResponse.json({ ok: false, message: '요청 출처를 확인해 주세요.' }, { status: 403 });
+  if (!isSameOrigin(request.headers)) return NextResponse.json({ ok: false, message: '요청 출처를 확인해 주세요.' }, { status: 403 });
   if (request.headers.get('content-type')?.split(';')[0] !== 'application/json') return NextResponse.json({ ok: false, message: 'JSON 요청이 필요해요.' }, { status: 415 });
   let input: unknown;
   try {
