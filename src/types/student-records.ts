@@ -6,6 +6,9 @@ import type { ErrorType, Judgment } from './content';
 
 export const RECORD_SCHEMA_VERSION = 1;
 
+/** 본인 생각·개념 설명 채점 방식 */
+export type GradingMethod = 'claude' | 'keyword';
+
 export interface ConceptCardView {
   term: string;
   gloss: string;
@@ -81,6 +84,8 @@ export interface ClaimGrade {
   judgmentCorrect: boolean;
   /** 0~2. null이면 "교수 채점 대기" (AI 채점 실패) */
   reasoningScore: number | null;
+  /** 본인 생각 점수를 매긴 방식. claude = AI 채점, keyword = 키워드 규칙(AI 실패 대체·local mock), rule = 오탐이라 규칙상 0 */
+  scoredBy?: GradingMethod | 'rule';
   explanation: string;
   feedback?: string;
 }
@@ -94,6 +99,10 @@ export interface ErrorReveal {
   evidenceLabel: string;
   /** 0~2. null이면 "교수 채점 대기" (AI 채점 실패) */
   conceptScore: number | null;
+  /** 개념 점수를 매긴 방식. rule = 오류를 놓쳐(맞다로 판정) 규칙상 0 */
+  conceptScoredBy?: GradingMethod | 'rule';
+  /** AI 채점이 준 개념 설명 피드백 */
+  conceptFeedback?: string;
   evidenceScore: number; // 0~2
 }
 
@@ -107,6 +116,12 @@ export interface ChallengeSubmission {
   submittedAt: string;
   /** 채점 주체. 'mock'은 학생 화면의 시연용 예시 채점(키워드 규칙), 'server'는 서버 API 채점 */
   grader: 'mock' | 'server';
+  /**
+   * 본인 생각·개념 점수를 매긴 방식. claude = Claude 채점, keyword = 키워드 규칙.
+   * server 채점에서 Claude가 실패·시간 초과하면 keyword로 대체한다. 이전 기록에는 없을 수 있다.
+   * DB에는 따로 저장하지 않고 claimGrades[].scoredBy에서 계산한다.
+   */
+  gradingMethod?: GradingMethod;
   /**
    * AI 채점이 실패해 교수 채점을 기다리는 항목. 비어 있으면 채점 완료.
    * 판정·근거·과정 감점 같은 규칙 기반 점수는 이 경우에도 저장된다.

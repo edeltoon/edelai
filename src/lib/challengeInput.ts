@@ -2,7 +2,7 @@
 // 모든 주장에 판정·확신도·본인 생각이 있어야 제출할 수 있다.
 // '틀리다'로 판정한 주장은 올바른 개념 설명과 근거까지 있어야 본인 생각이 완료된 것으로 센다.
 import type { Judgment } from '@/types/content';
-import { isReasonValid } from './reasoning';
+import { isReasonValid } from './reasoning.ts';
 
 /** 작성 중인 한 주장의 입력 (아직 비어 있을 수 있음) */
 export interface ClaimInput {
