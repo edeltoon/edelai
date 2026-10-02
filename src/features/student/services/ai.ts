@@ -1,13 +1,15 @@
 // 학생 화면의 유일한 AI·서버 API 진입점. 컴포넌트는 fetch를 직접 쓰지 않고 이 파일만 부른다.
 //
 // - 자유 학습: 항상 실제 POST /api/chat (mock 없음, 실패는 오류로 표시)
-// - 검증 챌린지: NEXT_PUBLIC_CHALLENGE_API=mock|live (기본 mock)
-//     mock: services/ai.mock.ts (시연용 예시 채점, grader 'mock')
-//     live: ai.types.ts 계약 경로 (/api/challenges/..., /api/submissions/...)
+// - 검증 챌린지 조회·제출·채점: 저장 모드(NEXT_PUBLIC_STORE_MODE, store.ts)를 따른다
+//     local : services/ai.mock.ts (학생 화면 시연용 예시 채점, grader 'mock'). 노트북 한 대 시연용
+//     server: serverApi.ts → /api/student/* (서버 채점·저장, grader 'server'). 계약은 store.types.ts
 import { detectDirectAnswer, type DirectAnswerMatch } from '@/lib/directAnswer';
 import type { ChatMessage } from '@/types/chat';
 import type { ChallengeSubmission, ConversationMessage } from '@/types/student-records';
-import { askTutorLive, getChallengeLive, saveAfterExplanationLive, submitChallengeLive } from './ai.live';
+import { askTutorLive } from './ai.live';
+import { getChallengeFromServer, saveAfterExplanationToServer, submitChallengeToServer } from './serverApi';
+import { STORE_MODE } from './store';
 import type {
   AskTutorResult,
   GetChallengeResponse,
@@ -16,11 +18,8 @@ import type {
   SubmitChallengeResponse,
 } from './ai.types';
 
-export type ChallengeApiMode = 'mock' | 'live';
-export const CHALLENGE_API_MODE: ChallengeApiMode =
-  process.env.NEXT_PUBLIC_CHALLENGE_API === 'live' ? 'live' : 'mock';
-/** 화면에 "시연용 예시 채점" 표시가 필요한지 */
-export const IS_MOCK_GRADING = CHALLENGE_API_MODE === 'mock';
+/** 화면에 "시연용 예시 채점" 표시가 필요한지 (local 모드) */
+export const IS_MOCK_GRADING = STORE_MODE === 'local';
 
 /* ───────────── 자유 학습 ───────────── */
 
@@ -90,18 +89,18 @@ export function checkDirectAnswer(text: string): DirectAnswerMatch {
 /* ───────────── 검증 챌린지 ───────────── */
 
 export async function getChallenge(challengeId: string, studentId: string): Promise<GetChallengeResponse> {
-  if (CHALLENGE_API_MODE === 'live') return getChallengeLive(challengeId, studentId);
+  if (STORE_MODE === 'server') return getChallengeFromServer(challengeId, studentId);
   const { getChallengeMock } = await import('./ai.mock');
   return getChallengeMock(challengeId);
 }
 
 export async function submitChallenge(challengeId: string, req: SubmitChallengeRequest): Promise<SubmitChallengeResponse> {
-  if (CHALLENGE_API_MODE === 'live') return submitChallengeLive(challengeId, req);
+  if (STORE_MODE === 'server') return submitChallengeToServer(challengeId, req);
   const { submitChallengeMock } = await import('./ai.mock');
   return submitChallengeMock(challengeId, req);
 }
 
-/** 해설 후 내 설명 저장. mock 모드는 서버가 없으므로 받은 제출 기록에 붙여 돌려준다 */
+/** 해설 후 내 설명 저장. local 모드는 서버가 없으므로 받은 제출 기록에 붙여 돌려준다(저장은 studentStore.saveSubmission) */
 export async function saveAfterExplanation(
   submission: ChallengeSubmission,
   afterExplanation: string,
@@ -110,6 +109,8 @@ export async function saveAfterExplanation(
   if (!text || text.length > 1000) {
     return { ok: false, error: { code: 'INVALID_INPUT', message: '해설 후 내 설명을 1~1,000자로 적어 주세요.' } };
   }
-  if (CHALLENGE_API_MODE === 'live') return saveAfterExplanationLive(submission.id, text);
+  if (STORE_MODE === 'server') {
+    return saveAfterExplanationToServer(submission.id, { userId: submission.studentId, afterExplanation: text });
+  }
   return { ok: true, submission: { ...submission, afterExplanation: text, afterExplainedAt: new Date().toISOString() } };
 }

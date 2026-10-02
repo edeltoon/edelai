@@ -1,4 +1,4 @@
-// 검증 챌린지 mock (서버 챌린지 API가 생기기 전 임시). 계약은 ai.types.ts와 같다.
+// 검증 챌린지 mock (local 모드). 응답 형태는 store.types.ts 서버 API 계약과 같다.
 // 채점은 src/lib의 키워드 규칙으로 하고, 결과에 grader: 'mock'을 남긴다(화면에 "시연용 예시 채점" 표시).
 // 정답 키는 제출할 때만 동적 import한다. 이 파일 위쪽에서 answerKey를 정적 import하지 말 것.
 import { calibrationAccuracy } from '@/lib/calibration';
@@ -123,7 +123,7 @@ export async function submitChallengeMock(
     submission: {
       id: newId('sub'),
       schemaVersion: RECORD_SCHEMA_VERSION,
-      studentId: req.studentId,
+      studentId: req.userId,
       courseId: req.courseId,
       challengeId,
       conceptId: challenge.conceptId,
