@@ -41,7 +41,9 @@
 
 ## 2. 타이포그래피
 - 서체: **Pretendard Variable** 하나만. 숫자는 `.tabular`(tabular-nums).
-- 스케일(px, 토큰 `text-caption/body/lead/title/page`): 13 보조 / 15 본문 / 17 강조 본문 / 20 행 제목 / 28 페이지 제목(굵게 700)
+- 스케일(px, 토큰 `text-caption/body/lead/title/display`): 13 보조 / 15 본문 / 17 강조 본문 / 20 행 제목 / 28 페이지 제목(굵게 700)
+- `text-hero`(32px): 서비스 이름 "Sejong Task" 전용(역할 선택 화면). 다른 제목에는 쓰지 않는다.
+- 글자 크기 토큰 이름은 색 토큰 이름(`page`, `subtle`, `ink` …)과 겹치면 안 된다. 겹치면 `text-page`처럼 한 클래스가 색과 크기를 동시에 가리켜 의도와 다르게 적용된다.
 - 줄간격: 본문 1.6, 제목 1.3. AI 답변·해설처럼 읽는 블록은 최대 폭 720px로 제한.
 - 금지: 제목 속 한 단어만 색/이탤릭 강조, 영문 대문자 라벨, 제목 위 작은 장식 라벨(eyebrow).
 
