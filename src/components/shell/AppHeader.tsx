@@ -17,7 +17,7 @@ export interface AppHeaderProps {
 
 export function AppHeader({ spaceName, role, userName, actions, onOpenMenu }: AppHeaderProps) {
   return (
-    <header className="flex h-[72px] shrink-0 items-center gap-4 border-b border-line-soft bg-page px-4 lg:px-6">
+    <header className="flex h-[72px] shrink-0 items-center gap-3 border-b border-line-soft bg-page px-4 lg:px-6">
       {onOpenMenu && (
         <button
           type="button"
@@ -31,10 +31,10 @@ export function AppHeader({ spaceName, role, userName, actions, onOpenMenu }: Ap
       <Wordmark />
       <span aria-hidden className="hidden h-8 w-px bg-line sm:block" />
       <p className="hidden text-title font-bold text-ink sm:block">{spaceName}</p>
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
         {actions}
         <RoleBadge role={role} />
-        <span className="text-body text-ink">{userName}</span>
+        <span className="hidden whitespace-nowrap text-body text-ink sm:inline">{userName}</span>
       </div>
     </header>
   );

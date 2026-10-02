@@ -66,7 +66,7 @@ Next.js 빌드와 별도로 ESLint를 실행합니다.
 src/app/
   globals.css   # Tailwind CSS 진입점
   layout.tsx    # 공통 HTML 구조와 메타데이터
-  page.tsx      # 실행 확인용 기본 페이지
+  page.tsx      # 학번·교번 로그인 페이지
 ```
 
 교수 UI는 `src/features/professor/`, 서버 AI 로직은 `src/lib/server/`에서 관리합니다.
