@@ -9,3 +9,4 @@ export {
 } from './AppSidebar';
 export { SpaceTabs, SpaceTitleBar, type SpaceTab, type SpaceTabsProps } from './SpaceTabs';
 export { RoleBadge } from './RoleBadge';
+export { Wordmark } from './Wordmark';
