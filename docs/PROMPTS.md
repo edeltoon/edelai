@@ -1,3 +1,7 @@
+# 현재 사용 시 주의
+
+스타터 참고 자료입니다. 실제 Claude 호출과 서버 실행 기준은 `docs/ARCHITECTURE.md`, API 형식은 `docs/API.md`를 우선합니다. 목데이터·localStorage 흐름은 화면 개발용 예시이며 실제 서버 연동 완료가 아닙니다.
+
 # Claude Code 프롬프트 모음
 
 사용법: 프로젝트 폴더에서 `claude` 실행 → 큰 단계는 **Shift+Tab으로 Plan 모드**로 바꾼 뒤 아래 프롬프트를 붙여넣기 →
@@ -20,15 +24,15 @@ CLAUDE.md, DESIGN.md, docs/PLAN.md를 먼저 읽어줘.
    / 로그인(역할 선택), /student, /student/course/[courseId], /student/course/[courseId]/challenge/[challengeId],
    /student/course/[courseId]/result/[challengeId], /student/profile,
    /professor, /professor/course/[courseId], /professor/course/[courseId]/cards, /professor/course/[courseId]/students/[studentId]
-   동적 라우트는 모두 generateStaticParams로 src/data 배열의 id를 반환하게 해줘.
+   동적 라우트는 서버에서 처리하고 존재하지 않는 id는 404로 처리해줘.
 5. CLAUDE.md 폴더 구조대로 디렉터리를 만들고, mock-data 스킬의 타입을 src/data/types.ts에 작성.
-   내용은 비워두되 정적 빌드가 되도록 mock-data 스킬의 고정 id(과목 phil, 챌린지 ch1·ch2, 학생 s1~s5)만 최소 필드로 자리를 잡아줘.
+   화면 개발용 샘플로 mock-data 스킬의 고정 id(과목 phil, 챌린지 ch1·ch2, 학생 s1~s5)만 최소 필드로 자리를 잡아줘.
 6. UtilityBar, AppHeader, DemoResetButton과 역할별 레이아웃(src/app/student/layout.tsx, src/app/professor/layout.tsx)을 DESIGN.md 3장대로 구현.
    역할은 src/providers의 RoleProvider(Context + localStorage edeltoon:role, useEffect 안에서 읽기). 역할이 안 맞으면 RoleGuard가 /로 보낸다.
 7. 로그인 화면: "학생으로 시작(김세종, 철학과 2학년)" / "교수로 시작(이석배 교수)" 두 버튼. 실제 인증은 없다는 작은 안내 문구.
-8. npm run build 통과(out/ 폴더 생성)와 npm run lint 확인.
+8. npm run build 통과(Next.js 서버 빌드)와 npm run lint 확인.
 
-끝나면 만든 파일 트리와, 내가 브라우저에서 확인할 주소(http://localhost:3000/edelai/)를 알려줘.
+끝나면 만든 파일 트리와, 내가 브라우저에서 확인할 주소(http://localhost:3000/)를 알려줘.
 ```
 
 ---
@@ -54,7 +58,7 @@ sejong-lms-ui 스킬과 DESIGN.md를 따라 학생 화면을 만들어줘.
 
 1. /student "나의강좌": 첨부한 세종대 LMS 스크린샷 구조 그대로. CourseRow 7개, 서양철학 행 오른쪽 지표에 "검증 챌린지 2건"을 추가. 서양철학만 클릭 가능.
 2. /student/course/phil: 과목 제목 영역 + UnderlineTabs(일반 학습 / 검증 챌린지 / 내 기록).
-3. 일반 학습 탭: 질문 입력창과 AIAnswerBlock. 답변은 scripted.ts에서 키워드로 고르고 문장 단위로 1.5초 안에 나타나게.
+3. 일반 학습 탭: 질문 입력창과 AIAnswerBlock. 답변은 docs/API.md의 POST /api/chat으로 실제 요청하고 로딩·실패 상태를 표시해.
    learning-loop-rules의 정답 직행 감지를 적용해서 "정답 번호만 해설 없이 알려줘"를 입력하면 답 대신 경고와 "검증 챌린지로 확인해 보세요" 안내를 보여줘.
 4. 검증 챌린지 탭: 챌린지 2개를 목록으로, 각 행에 "교수님이 승인한 오류 2개 포함" 문장 표시. 클릭하면 챌린지 화면으로.
 ```

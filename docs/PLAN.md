@@ -1,3 +1,9 @@
+# 현재 구현 기준
+
+아래는 팀원의 전체 기획 원문입니다. 구현 스택·배포·AI 연결은 [ARCHITECTURE.md](ARCHITECTURE.md)와 [API.md](API.md)를 우선합니다. 현재는 Next.js 서버에서 실제 Claude API를 호출하며, 목데이터 전용·정적 export·GitHub Pages 단독 배포를 사용하지 않습니다. 원문의 향후 기능은 구현 완료를 의미하지 않습니다.
+
+---
+
 **AI 시대 대학 학습 및 평가 재설계**
 
 AI 오류 검증 기반 과목별 학습 평가 플랫폼 기획서
