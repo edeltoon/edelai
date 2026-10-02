@@ -1,4 +1,6 @@
-// 데모 세션 읽기·쓰기 (브라우저 전용). 실제 인증이 아니라 역할 선택 결과만 담는다.
+// 브라우저 localStorage 세션(edeltoon:session) 읽기·쓰기. 화면 표시 호환용이다.
+// 로그인·권한·학생 식별은 서버의 HttpOnly 쿠키 세션(src/lib/server/auth.ts)이 기준이고, 이 값은 쓰지 않는다.
+// 사용처: 로그인 화면(표시용 저장), 로그아웃(정리), 첫 화면에서 쓰지 않는 역할 선택 데모(src/features/role-select).
 // localStorage는 렌더 중이 아니라 useEffect·이벤트 핸들러 안에서만 호출한다.
 import type { Role, Session } from '@/types/session';
 

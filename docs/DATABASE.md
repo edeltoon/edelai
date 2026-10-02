@@ -6,7 +6,7 @@ SeTask의 저장소는 **Supabase(Postgres)**입니다. **DB 접근은 서버(`s
 
 | 담당 | 범위 |
 |---|---|
-| 학생 화면 담당 | 스키마(`supabase/migrations/`), 서버 DB 계층(`src/lib/db/`), 학생 API(`/api/student/*`, 다음 PR), `GET /api/health/db` |
+| 학생 화면 담당 | 스키마(`supabase/migrations/`), 서버 DB 계층(`src/lib/db/`), 학생 API(`/api/student/*`), `GET /api/health/db` |
 | 교수 화면 담당 | 교수 API(오류 카드 저장·승인·반려, 학생 기록 조회, 교수 조정·확정). `src/lib/db/` 함수로 만든다 |
 
 DB 함수가 더 필요하면 학생 화면 담당에게 요청하거나, `src/lib/db/`에 추가하는 PR을 올려 주세요.
@@ -73,7 +73,7 @@ import { listErrorCards, approveErrorCard, listSubmissions, DbError } from '@/li
 | 파일 | 함수 |
 |---|---|
 | `errorCards.ts` | `listErrorCards({ courseId, status? })`, `getErrorCard`, `saveErrorCards(cards, courseId)`, `approveErrorCard(id, by)`, `rejectErrorCard(id, by, reason)`, `resetErrorCardToPending` |
-| `challenges.ts` | `getPublicChallenge(id)`(공개 정보 + 승인 확인), `listChallenges(courseId)`, `getChallengeForGrading(id)`(서버 채점 전용) |
+| `challenges.ts` | `getPublicChallenge(id)`(공개 정보 + 승인 확인), `listChallenges(courseId)`, `getChallengeForGrading(id)`(서버 채점 전용, `status: ok·not_found·not_approved`) |
 | `submissions.ts` | `insertSubmission`, `getSubmission`, `listSubmissions({ studentId?, courseId?, challengeId? })`, `updateAfterExplanation(id, studentId, text)`, `saveProfessorReview`, `finalizeSubmission` |
 | `students.ts` | `listStudents`, `getStudent`, `insertDirectAnswerAttempt`, `listDirectAnswerAttempts`, `insertRetrieval`, `listRetrievals`, `getStudentRecords(studentId)`, `resetStudentRecords(studentId)` |
 | `demo.ts` | `resetDemo(studentId)`, `DEMO_ERROR_CARD_IDS` |
@@ -85,7 +85,7 @@ import { listErrorCards, approveErrorCard, listSubmissions, DbError } from '@/li
 
 ## 6. 시연 리셋
 
-- **코드**: `resetDemo(studentId)`를 호출합니다. 학생 API `POST /api/student/demo-reset`(다음 PR)이 이 함수를 씁니다.
+- **코드**: `resetDemo(studentId)`를 호출합니다. 학생 API `POST /api/student/demo-reset`이 이 함수를 씁니다.
   - 그 학생의 `retrievals`, `submissions`, `direct_answer_attempts`를 지웁니다.
   - 시연용 오류 카드(`DEMO_ERROR_CARD_IDS` = `ec-idea-1`)를 **승인 대기(pending)**로 되돌려, 교수 승인 장면부터 다시 시연할 수 있게 합니다.
   - 오류 카드 내용·챌린지·학생은 남깁니다.

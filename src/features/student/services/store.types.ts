@@ -5,10 +5,10 @@
 //   local  (기본): store.local.ts. localStorage + 학생 화면 mock 채점. 노트북 한 대 시연용으로 끝까지 유지
 //   server       : store.server.ts. 아래 계약의 /api/student/* 를 호출. 실패는 오류로 보여주고 local로 대체하지 않음
 //
-// 이 파일의 "서버 API 계약"은 학생 API(/api/student/*)의 형태다. Supabase와 학생 API는 학생 화면 담당이
-// feat/supabase에서 구현한다(교수 API는 교수 담당이 같은 DB 계층으로 만든다).
-// 학생 식별: 실제 인증이 없으므로 세션의 userId(예: 's1')를 GET은 쿼리, POST/PATCH는 본문으로 보낸다.
-//           인증이 생기면 서버가 세션에서 꺼내고 이 필드는 무시해도 된다.
+// 이 파일의 "서버 API 계약"은 학생 API(/api/student/*, src/lib/server/student-api.ts)의 형태다.
+// 학생 식별: 로그인 쿠키 세션(HttpOnly setask-access)의 app_user_id. 요청에 userId를 보내지 않는다(보내도 무시).
+//   같은 출처의 fetch는 쿠키를 자동으로 싣는다. 로그인 없음 401, 학생 계정이 아님 403, 명부에 없음 404.
+//   POST·PATCH는 같은 출처(Origin)여야 한다(src/proxy.ts).
 // 오류 형식: /api/chat과 같다. HTTP 상태 코드 + { ok: false, error: { code, message } }
 import type {
   ChallengeSubmission,
@@ -115,7 +115,7 @@ export const studentApi = {
   demoReset: () => '/api/student/demo-reset',
 } as const;
 
-/* ── 2-1. GET /api/student/challenges/{challengeId}?userId=s1 ── */
+/* ── 2-1. GET /api/student/challenges/{challengeId} ── */
 
 /** 학생에게 보내는 주장. 오류 여부·오류 카드 id는 절대 포함하지 않는다 */
 export interface ChallengeClaimPublic {
@@ -157,7 +157,6 @@ export type GetChallengeResponse = { ok: true; challenge: ChallengePublic } | Ap
 
 /** 모든 주장의 판정·확신도·본인 생각이 채워진 경우에만 보낸다(화면에서 막고, 서버도 400 INCOMPLETE_SUBMISSION) */
 export interface SubmitChallengeRequest {
-  userId: string;
   courseId: string;
   /** 주장 순서대로. claimId는 ChallengePublic.claims[].id */
   answers: ClaimAnswer[];
@@ -171,8 +170,8 @@ export interface SubmitChallengeRequest {
  * 서버가 채점하고 저장한 뒤 제출 기록 전체를 돌려준다(이때 처음으로 정답·해설 포함).
  * 채점 규칙(src/lib 순수 함수를 그대로 쓰면 학생 화면 local 모드와 결과가 같다):
  * - 판정 정오(규칙): 오류 주장이면 'wrong', 아니면 'correct'가 정답
- * - 본인 생각 0~2, 올바른 개념 0~2: AI 평가(Claude). AI 채점이 실패해도 제출 전체를 실패시키지 않는다.
- *   규칙 기반 점수(판정·근거·과정 감점)는 저장하고, 실패한 AI 항목만 null + pendingReview에 넣어 "교수 채점 대기"로 둔다.
+ * - 본인 생각 0~2, 올바른 개념 0~2: AI 평가(Claude, 교수 정답 설명 기준). AI 채점이 실패·시간 초과되면
+ *   제출을 실패시키지 않고 키워드 규칙 점수로 대체한다. submission.gradingMethod와 응답 grading으로 표시한다.
  *   (키워드 점수로 조용히 대체하지 않는다)
  *   단, 오탐(맞는 주장을 '틀리다')인 주장의 본인 생각 점수는 0 (scoring.claimReasoningScore)
  * - 근거 0/2(규칙): evidenceId === 오류 카드 evidenceId
@@ -181,19 +180,25 @@ export interface SubmitChallengeRequest {
  * - 재인출 예약: schedule.retrievalDate(submittedAt)
  * - submission.grader = 'server'
  */
-export type SubmitChallengeResponse = { ok: true; submission: ChallengeSubmission } | ApiError;
+export type SubmitChallengeResponse =
+  | {
+      ok: true;
+      submission: ChallengeSubmission;
+      /** 서버 채점 정보. method가 keyword면 fallbackReason에 Claude 실패 사유 (local mock 응답에는 없음) */
+      grading?: { method: 'claude' | 'keyword'; fallbackReason?: string; model?: string };
+    }
+  | ApiError;
 
 /* ── 2-3. PATCH /api/student/submissions/{submissionId} ── */
 
 export interface SaveAfterExplanationRequest {
-  userId: string;
   /** 해설 후 내 설명 (1~1,000자) */
   afterExplanation: string;
 }
 
 export type SaveAfterExplanationResponse = { ok: true; submission: ChallengeSubmission } | ApiError;
 
-/* ── 2-4. GET /api/student/records?userId=s1 ── */
+/* ── 2-4. GET /api/student/records ── */
 
 /** 서버에 있는 기록만 담는다. 대화 기록(conversations)은 서버 저장이 정해지기 전까지 빈 배열이어도 된다 */
 export type GetStudentRecordsResponse = { ok: true; records: StudentRecords } | ApiError;
@@ -201,14 +206,10 @@ export type GetStudentRecordsResponse = { ok: true; records: StudentRecords } | 
 /* ── 2-5. POST /api/student/direct-answer-attempts ── */
 
 export interface RecordDirectAnswerAttemptRequest {
-  userId: string;
   courseId: string;
   conversationId: string;
-  /** 학생이 입력한 원문 (교수 원문 열람용) */
+  /** 학생이 입력한 원문 (교수 원문 열람용). 걸린 표현(matched)과 시각(at)은 서버가 정한다 */
   text: string;
-  /** 걸린 표현. 예: '정답 번호' */
-  matched: string;
-  at: string;
 }
 
 export type RecordDirectAnswerAttemptResponse = { ok: true; attempt: DirectAnswerAttempt } | ApiError;
@@ -216,7 +217,6 @@ export type RecordDirectAnswerAttemptResponse = { ok: true; attempt: DirectAnswe
 /* ── 2-6. POST /api/student/retrievals (첫 목표 이후) ── */
 
 export interface SaveRetrievalRequest {
-  userId: string;
   courseId: string;
   challengeId: string;
   submissionId: string;
@@ -233,8 +233,7 @@ export type SaveRetrievalResponse = { ok: true; retrieval: RetrievalResult } | A
 
 /* ── 2-7. POST /api/student/demo-reset ── */
 
-export interface DemoResetRequest {
-  userId: string;
-}
+/** 본문 없음. 로그인한 학생의 기록을 지운다 */
+export type DemoResetRequest = Record<string, never>;
 
 export type DemoResetResponse = { ok: true } | ApiError;

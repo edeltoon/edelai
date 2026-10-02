@@ -88,16 +88,21 @@ export function checkDirectAnswer(text: string): DirectAnswerMatch {
 
 /* ───────────── 검증 챌린지 ───────────── */
 
-export async function getChallenge(challengeId: string, studentId: string): Promise<GetChallengeResponse> {
-  if (STORE_MODE === 'server') return getChallengeFromServer(challengeId, studentId);
+export async function getChallenge(challengeId: string): Promise<GetChallengeResponse> {
+  if (STORE_MODE === 'server') return getChallengeFromServer(challengeId);
   const { getChallengeMock } = await import('./ai.mock');
   return getChallengeMock(challengeId);
 }
 
-export async function submitChallenge(challengeId: string, req: SubmitChallengeRequest): Promise<SubmitChallengeResponse> {
+/** 제출. server 모드는 로그인 세션으로 학생을 식별하고, local mock은 studentId를 기록에 쓴다 */
+export async function submitChallenge(
+  challengeId: string,
+  studentId: string,
+  req: SubmitChallengeRequest,
+): Promise<SubmitChallengeResponse> {
   if (STORE_MODE === 'server') return submitChallengeToServer(challengeId, req);
   const { submitChallengeMock } = await import('./ai.mock');
-  return submitChallengeMock(challengeId, req);
+  return submitChallengeMock(challengeId, studentId, req);
 }
 
 /** 해설 후 내 설명 저장. local 모드는 서버가 없으므로 받은 제출 기록에 붙여 돌려준다(저장은 studentStore.saveSubmission) */
@@ -110,7 +115,7 @@ export async function saveAfterExplanation(
     return { ok: false, error: { code: 'INVALID_INPUT', message: '해설 후 내 설명을 1~1,000자로 적어 주세요.' } };
   }
   if (STORE_MODE === 'server') {
-    return saveAfterExplanationToServer(submission.id, { userId: submission.studentId, afterExplanation: text });
+    return saveAfterExplanationToServer(submission.id, { afterExplanation: text });
   }
   return { ok: true, submission: { ...submission, afterExplanation: text, afterExplainedAt: new Date().toISOString() } };
 }

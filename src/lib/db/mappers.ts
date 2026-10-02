@@ -85,6 +85,16 @@ export function toChallengePublic(row: ChallengeRow): ChallengePublic {
   };
 }
 
+/** 제출 단위 채점 방식: 주장별 scoredBy에서 계산 (DB 컬럼 없음). 하나라도 keyword면 keyword */
+function gradingMethodOf(row: SubmissionRow): ChallengeSubmission['gradingMethod'] {
+  const methods = [
+    ...row.claim_grades.map((g) => g.scoredBy),
+    ...row.error_reveals.map((r) => r.conceptScoredBy),
+  ].filter((m): m is 'claude' | 'keyword' => m === 'claude' || m === 'keyword');
+  if (methods.length === 0) return undefined;
+  return methods.every((m) => m === 'claude') ? 'claude' : 'keyword';
+}
+
 export function toSubmission(row: SubmissionRow): SubmissionRecord {
   return {
     id: row.id,
@@ -95,6 +105,7 @@ export function toSubmission(row: SubmissionRow): SubmissionRecord {
     conceptId: row.concept_id,
     submittedAt: row.submitted_at,
     grader: row.grader,
+    gradingMethod: gradingMethodOf(row),
     answers: row.answers,
     directAnswerFlag: row.direct_answer_flag,
     pastedRatio: row.pasted_ratio,
