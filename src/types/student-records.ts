@@ -1,86 +1,8 @@
-// 공용 데이터 타입. 필드 이름을 바꿀 때는 학생·교수·데이터 담당 모두에게 먼저 확인한다.
-// 1) 콘텐츠 타입: mock-data 스킬 스키마
-// 2) 세션 타입: 확정. 역할 선택 화면이 저장 (localStorage `edeltoon:session`)
-// 3) 학생 기록 타입: 학생 화면이 저장하고 교수 화면이 읽는다 (키 목록은 docs/STUDENT_RECORDS.md)
+// 학생 기록 타입 (초안). 학생 화면이 저장하고 교수 화면이 읽는다.
+// 저장 키와 교체 계획은 docs/STUDENT_RECORDS.md (학생 화면 PR에서 추가).
+// 서버 API의 ChatMessage(src/types/chat.ts)와 구분하려고 대화 메시지는 ConversationMessage로 부른다.
 
-/* ───────────── 1. 콘텐츠 ───────────── */
-
-export type Role = 'student' | 'professor';
-export type ErrorType = '개념 반전' | '개념 혼동' | '근거 누락' | '허위 출처';
-export type Judgment = 'correct' | 'wrong'; // 맞다 / 틀리다
-
-export interface Course {
-  id: string;
-  code: string;
-  name: string;
-  term: string;
-  professorName: string;
-  /** 데모에서 클릭 가능한 과목인지 (서양철학만 true) */
-  enabled: boolean;
-}
-
-export interface Concept {
-  id: string;
-  courseId: string;
-  name: string;
-  keywords: string[];
-}
-
-/** 강의자료 근거. label 예: "3주차 강의자료 · p.12" */
-export interface Evidence {
-  id: string;
-  label: string;
-  excerpt?: string;
-}
-
-export interface ErrorCard {
-  id: string;
-  conceptId: string;
-  wrongClaim: string;
-  correctClaim: string;
-  correctKeywords: string[];
-  evidenceId: string;
-  errorType: ErrorType;
-  difficulty: '하' | '중' | '상';
-  approvalStatus: 'pending' | 'approved' | 'rejected';
-  approvedBy?: string;
-}
-
-/** errorCardId가 있으면 오류 주장. 학생 화면으로 보내는 데이터에는 절대 포함하지 않는다 */
-export interface Claim {
-  id: string;
-  text: string;
-  errorCardId?: string;
-}
-
-export interface Challenge {
-  id: string;
-  courseId: string;
-  conceptId: string;
-  title: string;
-  question: string;
-  claims: Claim[];
-  evidenceOptions: string[];
-}
-
-/* ───────────── 2. 세션 ───────────── */
-
-/**
- * localStorage `edeltoon:session` (확정). 역할 선택 화면이 저장하고 학생·교수 화면이 읽는다.
- * 실제 인증 없음, 가상 정보만. 형태를 바꾸면 팀원(교수 화면·서버 API 담당)에게 공유한다.
- */
-export interface Session {
-  role: Role;
-  /** 학생: s1~s5, 교수: p1 */
-  userId: string;
-  name: string;
-  /** 학번·교번 (가상) */
-  memberNo: string;
-  major?: string;
-  signedInAt: string; // ISO
-}
-
-/* ───────────── 3. 학생 기록 ───────────── */
+import type { ErrorType, Judgment } from './content';
 
 export const RECORD_SCHEMA_VERSION = 1;
 
@@ -94,7 +16,7 @@ export interface CitationView {
   label: string;
 }
 
-export interface ChatMessage {
+export interface ConversationMessage {
   id: string;
   role: 'user' | 'ai' | 'notice';
   text: string;
@@ -114,7 +36,7 @@ export interface Conversation {
   title: string;
   createdAt: string;
   updatedAt: string;
-  messages: ChatMessage[];
+  messages: ConversationMessage[];
 }
 
 export interface DirectAnswerAttempt {

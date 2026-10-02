@@ -1,4 +1,4 @@
-import type { Role } from '@/data/types';
+import type { Role } from '@/types/session';
 
 const LABEL: Record<Role, string> = { student: '학생', professor: '교수' };
 

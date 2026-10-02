@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Role } from '@/data/types';
+import type { Role } from '@/types/session';
 import { RoleBadge } from './RoleBadge';
 import { MenuIcon } from './icons';
 
