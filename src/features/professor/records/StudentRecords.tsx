@@ -5,6 +5,7 @@ import { ProfessorShell } from '../ProfessorShell';
 import type { SubmissionView } from './reader';
 import { useRecords } from './useRecords';
 import { sampleStudents } from './sample';
+import { EvaluationReview } from '../evaluation/EvaluationReview';
 
 const button = 'rounded-control border border-line-strong bg-page px-4 py-2 text-body hover:bg-subtle';
 const panel = 'rounded-block border border-line bg-page p-5 sm:p-6';
@@ -41,7 +42,7 @@ export function StudentRecords() {
       {current ? <div className="min-w-0 space-y-6">
         <section className={panel}><h3 className="break-words text-title font-bold">{current.id} · 학습 기록</h3><p className="mt-2 text-caption text-ink-sub">{sample ? '가상 예시' : '브라우저 임시 기록'} · 제출 전 작성 중인 답안은 표시하지 않습니다.</p></section>
         <section aria-label="챌린지 제출 기록"><h3 className="mb-3 text-title font-semibold">챌린지 제출 기록</h3>
-          {current.submissions.length ? <div className="space-y-4">{current.submissions.map((submission, index) => <Submission key={`${submission.id}-${index}`} submission={submission} />)}</div>
+          {current.submissions.length ? <div className="space-y-4">{current.submissions.map((submission, index) => <Submission key={JSON.stringify([sample, current.id, submission, index])} submission={submission} />)}</div>
             : <div className={panel}><p className="text-body text-ink-sub">제출한 챌린지가 없습니다.</p></div>}
         </section>
         <section className={panel}><h3 className="text-title font-semibold">대화 원문</h3><p className="mt-2 text-caption text-ink-sub">저장된 질문과 응답입니다. AI 요약을 새로 생성하지 않습니다.</p>
@@ -60,5 +61,6 @@ function Submission({ submission: s }: { submission: SubmissionView }) {
     <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">{Object.entries(scoreLabels).map(([key, label]) => <div key={key} className="rounded-control bg-subtle p-3"><dt className="text-caption text-ink-sub">{label}</dt><dd className="text-lead font-semibold">{s.score[key as keyof typeof scoreLabels]}</dd></div>)}<div className="rounded-control bg-subtle p-3"><dt className="text-caption text-ink-sub">확신도 보정 정확도</dt><dd className="text-lead font-semibold">{s.calibration}%</dd></div></dl>
     <div className="mt-5 grid gap-4 md:grid-cols-2"><div><h4 className="mb-2 text-body font-semibold">해설 전 생각 요약 · 저장 기록</h4><p className={paragraph}>{s.beforeSummary || '기록 없음'}</p></div><div><h4 className="mb-2 text-body font-semibold">해설 후 내 설명</h4><p className={paragraph}>{s.afterExplanation || '아직 작성하지 않았습니다.'}</p></div></div>
     <h4 className="mt-6 text-body font-semibold">주장별 제출 원문</h4><div className="mt-3 space-y-3">{s.answers.map((answer, index) => <section key={`${answer.claimId}-${index}`} className="rounded-block border border-line p-4"><h5 className="text-body font-semibold">주장 {answer.claimId} · {answer.judgment === 'correct' ? '맞다' : '틀리다'} · 확신도 {answer.confidence}%</h5><p className={`${paragraph} mt-2`}>{answer.reasoning}</p>{answer.correction && <p className={`${paragraph} mt-3`}><strong>올바른 개념: </strong>{answer.correction}</p>}<p className="mt-3 break-words text-caption text-ink-sub">선택 근거: {answer.evidenceId || '선택 없음'}</p></section>)}</div>
+    <EvaluationReview originalScore={s.score.total} />
   </details>;
 }
