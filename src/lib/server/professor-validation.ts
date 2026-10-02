@@ -25,7 +25,7 @@ export function reviewInput(input: unknown, original: ScoreBreakdown) {
   if (!object(input) || !object(input.score) || input.reviewed !== true) return invalid('제출 원문과 점수 근거를 확인해 주세요.');
   const s = input.score;
   for (const [key,max] of [['judgment',1],['reasoning',2],['concept',2],['evidence',2]] as const) {
-    const n=s[key]; if (typeof n !== 'number' || !Number.isFinite(n) || n<0 || n>max || Math.abs(n*10-Math.round(n*10))>1e-8) return invalid('항목별 점수를 범위 안에서 소수 첫째 자리까지 입력해 주세요.');
+    const n=s[key]; if (typeof n !== 'number' || !Number.isFinite(n) || n<0 || n>max || !Number.isInteger(n)) return invalid('항목별 점수를 범위 안의 정수로 입력해 주세요.');
   }
   if (s.penalty !== 0 && s.penalty !== -2) return invalid('과정 감점은 0 또는 -2점입니다.');
   const score = { judgment:s.judgment, reasoning:s.reasoning, concept:s.concept, evidence:s.evidence, penalty:s.penalty } as ScoreBreakdown;

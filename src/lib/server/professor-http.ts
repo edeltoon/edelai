@@ -1,10 +1,14 @@
 import 'server-only';
+import { cookies } from 'next/headers';
+import { AUTH_COOKIE, verifyAccess } from './auth';
 import { DbError } from '@/lib/db/client';
 import { ProfessorInputError } from './professor-validation';
 export function json(data: unknown, status=200) { return Response.json(data,{status,headers:{'Cache-Control':'no-store'}}); }
-export function gate(request: Request) {
+export async function gate(request: Request) {
+  const session=await verifyAccess((await cookies()).get(AUTH_COOKIE)?.value);
+  if(session?.role!=='professor' || session.userId!=='p1')return json({ok:false,error:{message:'담당 교수 계정으로 로그인해 주세요.'}},403);
   const url=new URL(request.url);
-  // 로그인 PR 통합 전에는 명시적으로 켠 로컬 서버에서만 허용한다.
+  // 현재 시연 과목은 p1 담당. 다중 과목 권한 모델 도입 전 로컬 시연으로 제한.
   if (process.env.PROFESSOR_DB_ENABLED!=='true' || !['localhost','127.0.0.1','[::1]'].includes(url.hostname)) return json({ok:false,error:{message:'교수 DB 기능은 로컬 서버에서 PROFESSOR_DB_ENABLED=true 설정 후 사용할 수 있습니다.'}},403);
   if (request.method!=='GET' && request.headers.get('origin')!==url.origin) return json({ok:false,error:{message:'요청 출처를 확인해 주세요.'}},403);
 }

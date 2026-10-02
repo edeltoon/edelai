@@ -33,7 +33,7 @@ export function StudentRecords() {
     </div>
     {!sample && error && <p role="alert" className="mt-4 text-wrong">{error}</p>}
     <div className="mt-4 flex flex-wrap items-center gap-4"><button aria-pressed={sample} className={button} onClick={() => { setSample(!sample); setSelected(''); setQuery(''); }}>{sample ? '저장된 기록으로 돌아가기' : '화면 예시 보기'}</button>
-      <p role="status" className="text-caption text-ink-sub">{sample ? '직접 작성한 가상 기록입니다. 저장된 학생 데이터를 변경하지 않습니다.' : loaded ? `기록이 있는 학생 ${students.length}명` : '기록을 읽는 중입니다…'}</p>
+      <p role="status" className="text-caption text-ink-sub">{sample ? '직접 작성한 가상 기록입니다. 저장된 학생 데이터를 변경하지 않습니다.' : loaded ? `등록 학생 ${students.length}명` : '기록을 읽는 중입니다…'}</p>
     </div>
     {!sample && snapshot.warnings.length > 0 && <div role="alert" className="mt-4 rounded-block bg-caution-bg p-4 text-body text-caution"><p>일부 기록을 읽지 못했습니다. 원본은 변경하지 않았습니다.</p><ul className="mt-2 list-inside list-disc">{snapshot.warnings.map(message => <li key={message}>{message}</li>)}</ul></div>}
     <div className="mt-6 grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">

@@ -20,7 +20,7 @@ DB 함수가 더 필요하면 학생 화면 담당에게 요청하거나, `src/l
 | `NEXT_PUBLIC_STORE_MODE` | `local`(기본) \| `server` | 학생 화면 저장소 선택(비밀 아님). `server`는 학생 API가 생긴 뒤 사용 |
 
 - Supabase 변수에 `NEXT_PUBLIC_` 접두사를 붙이지 않습니다. 붙이면 값이 브라우저 번들에 들어갑니다.
-- 공개(publishable) 키는 쓰지 않습니다. 브라우저용 Supabase 클라이언트도 만들지 않습니다.
+- DB 접근에는 공개(publishable) 키를 쓰지 않습니다. 로그인 인증은 별도의 SUPABASE_PUBLISHABLE_KEY를 서버에서 사용합니다(docs/AUTH.md). 브라우저용 Supabase 클라이언트는 만들지 않습니다.
 - 서버 클라이언트는 `src/lib/db/client.ts`(`import 'server-only'`)에 있습니다. 클라이언트 컴포넌트에서 import하면 빌드가 실패합니다.
 
 ## 3. SQL 실행 방법
@@ -98,3 +98,7 @@ import { listErrorCards, approveErrorCard, listSubmissions, DbError } from '@/li
   ```
   카드만 되돌리려면 `0002_seed.sql`을 다시 실행해도 됩니다.
 - 학생 화면이 `NEXT_PUBLIC_STORE_MODE=local`이면 DB와 상관없이 브라우저 기록만 지웁니다(헤더 "시연 리셋").
+
+## 교수 연결 확인 (2026-10-03)
+
+`professor_score`, `professor_comment`, `finalized_*` 계약을 실제 저장·조회로 확인했습니다. 확정은 점수와 함께 한 번의 UPDATE로 저장하고 `updated_at`으로 동시 변경을 검사합니다. 세부 API와 제한은 [교수 DB 연결](PROFESSOR_DB.md)을 참고하세요.

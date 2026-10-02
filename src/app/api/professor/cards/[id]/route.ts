@@ -5,7 +5,7 @@ import {body,failure,gate,json} from '@/lib/server/professor-http';
 import {object,ProfessorInputError,textField,version} from '@/lib/server/professor-validation';
 import type {ErrorCardRow} from '@/lib/db/types';
 export async function PATCH(request:Request,ctx:{params:Promise<{id:string}>}) {
- const denied=gate(request);if(denied)return denied;
+ const denied=await gate(request);if(denied)return denied;
  try{
  const {id}=await ctx.params;const input=await body(request);
  if(!object(input))throw new ProfessorInputError('입력이 올바르지 않습니다.');
