@@ -7,8 +7,13 @@ import {
 import type { ChallengePublic } from "../src/types/challenge.ts";
 import type { ChallengeAnswerKey, ErrorCardRecord, SubmissionRecord } from "../src/lib/db/types.ts";
 import type { ClaimAnswer, DirectAnswerAttempt } from "../src/types/student-records.ts";
+import type { Session } from "../src/types/session.ts";
 
 const SECRET = "test-secret-not-real";
+const sessionOf = (userId: string, role: Session["role"] = "student"): Session =>
+  ({ role, userId, name: "가상 학생", memberNo: "26011225", signedInAt: "2026-10-03T00:00:00Z" });
+/** 로그인한 학생 s1 (쿠키 확인을 대신함) */
+const asS1 = async () => sessionOf("s1");
 const env = { NODE_ENV: "test", ANTHROPIC_API_KEY: SECRET, ANTHROPIC_MODEL: "claude-test" };
 
 const challenge: ChallengePublic = {
@@ -102,22 +107,28 @@ const post = (path: string, body: unknown, method = "POST") => new Request(`http
   method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
 });
 const submit = (answers: ClaimAnswer[], extra: Record<string, unknown> = {}) =>
-  post("/api/student/challenges/ch1/submissions", { userId: "s1", courseId: "phil", answers, directAnswerFlag: false, startedAt: "2026-10-03T00:00:00Z", ...extra });
+  post("/api/student/challenges/ch1/submissions", { courseId: "phil", answers, directAnswerFlag: false, startedAt: "2026-10-03T00:00:00Z", ...extra });
 
 test("GET challenge: blocked until approved, and never exposes answers", async () => {
-  const pending = await handleGetChallenge(get("/api/student/challenges/ch1?userId=s1"), "ch1", { db: fakeDb({ approved: false }).db, env });
+  const pending = await handleGetChallenge(get("/api/student/challenges/ch1"), "ch1", { db: fakeDb({ approved: false }).db, env, authenticate: asS1 });
   assert.equal(pending.status, 409);
   assert.equal((await pending.json()).error.code, "CHALLENGE_NOT_APPROVED");
 
-  const ok = await handleGetChallenge(get("/api/student/challenges/ch1?userId=s1"), "ch1", { db: fakeDb().db, env });
+  const ok = await handleGetChallenge(get("/api/student/challenges/ch1"), "ch1", { db: fakeDb().db, env, authenticate: asS1 });
   assert.equal(ok.status, 200);
   const text = await ok.text();
   for (const leak of ["isError", "explanation", "errorCard", "correctClaim", "ec-idea-1", "reasonKeywords"]) assert.ok(!text.includes(leak), leak);
   assert.equal(JSON.parse(text).challenge.errorCount, 1);
 
-  assert.equal((await handleGetChallenge(get("/api/student/challenges/ch9?userId=s1"), "ch9", { db: fakeDb().db, env })).status, 404);
-  assert.equal((await handleGetChallenge(get("/api/student/challenges/ch1?userId=nobody"), "ch1", { db: fakeDb().db, env })).status, 404);
-  assert.equal((await handleGetChallenge(get("/api/student/challenges/ch1?userId=a%20b"), "ch1", { db: fakeDb().db, env })).status, 400);
+  assert.equal((await handleGetChallenge(get("/api/student/challenges/ch9"), "ch9", { db: fakeDb().db, env, authenticate: asS1 })).status, 404);
+  // 학생은 로그인 세션(app_user_id)으로만 식별한다: 쿼리의 userId는 무시
+  const getAs = (authenticate: () => Promise<Session | null>) =>
+    handleGetChallenge(get("/api/student/challenges/ch1?userId=s2"), "ch1", { db: fakeDb().db, env, authenticate });
+  assert.equal((await getAs(async () => null)).status, 401);
+  assert.equal((await getAs(async () => sessionOf("p1", "professor"))).status, 403);
+  const unknown = await getAs(async () => sessionOf("nobody"));
+  assert.equal(unknown.status, 404);
+  assert.equal((await unknown.json()).error.code, "STUDENT_NOT_FOUND");
 });
 
 test("submit: Claude grades reasoning and concept, rules handle judgment, false alarms and evidence", async () => {
@@ -125,7 +136,7 @@ test("submit: Claude grades reasoning and concept, rules handle judgment, false 
   const calls: ClaudeCall[] = [];
   // A를 '틀리다'로 판정한 오탐: Claude가 2점을 줘도 규칙상 0점
   const answers = designAnswers.map((a) => (a.claimId === "ch1-a" ? { ...a, judgment: "wrong" as const, correction: "감각 세계는 실재다", evidenceId: "ev-w3-p10" } : a));
-  const res = await handleSubmitChallenge(submit(answers), "ch1", { db, env, fetcher: claudeReturning(allTwos, calls) });
+  const res = await handleSubmitChallenge(submit(answers), "ch1", { db, env, fetcher: claudeReturning(allTwos, calls), authenticate: asS1 });
   assert.equal(res.status, 201);
   const body = await res.json();
   assert.equal(body.grading.method, "claude");
@@ -161,7 +172,7 @@ test("submit: falls back to keyword scoring on timeout, invalid output, or missi
       reject(new DOMException("aborted", "AbortError"));
     });
   });
-  const timeout = await (await handleSubmitChallenge(submit(designAnswers), "ch1", { db: fakeDb().db, env, fetcher: hanging, timeoutMs: 30 })).json();
+  const timeout = await (await handleSubmitChallenge(submit(designAnswers), "ch1", { db: fakeDb().db, env, fetcher: hanging, timeoutMs: 30, authenticate: asS1 })).json();
   assert.equal(timeout.grading.method, "keyword");
   assert.equal(timeout.grading.fallbackReason, "timeout");
   assert.equal(timeout.submission.gradingMethod, "keyword");
@@ -169,22 +180,22 @@ test("submit: falls back to keyword scoring on timeout, invalid output, or missi
   assert.ok(timeout.submission.claimGrades.every((g: { scoredBy: string }) => g.scoredBy === "keyword"));
 
   const missingClaim = { ...allTwos, claims: allTwos.claims.slice(1) };
-  const invalid = await (await handleSubmitChallenge(submit(designAnswers), "ch1", { db: fakeDb().db, env, fetcher: claudeReturning(missingClaim) })).json();
+  const invalid = await (await handleSubmitChallenge(submit(designAnswers), "ch1", { db: fakeDb().db, env, fetcher: claudeReturning(missingClaim), authenticate: asS1 })).json();
   assert.equal(invalid.grading.fallbackReason, "invalid_output");
   const outOfRange = { ...allTwos, conceptTargets: [{ claimId: "ch1-b", conceptScore: 3, feedback: "x" }] };
-  assert.equal((await (await handleSubmitChallenge(submit(designAnswers), "ch1", { db: fakeDb().db, env, fetcher: claudeReturning(outOfRange) })).json()).grading.fallbackReason, "invalid_output");
+  assert.equal((await (await handleSubmitChallenge(submit(designAnswers), "ch1", { db: fakeDb().db, env, fetcher: claudeReturning(outOfRange), authenticate: asS1 })).json()).grading.fallbackReason, "invalid_output");
 
   const refusal: typeof fetch = async () => Response.json({ stop_reason: "refusal", content: [] });
-  assert.equal((await (await handleSubmitChallenge(submit(designAnswers), "ch1", { db: fakeDb().db, env, fetcher: refusal })).json()).grading.fallbackReason, "refusal");
+  assert.equal((await (await handleSubmitChallenge(submit(designAnswers), "ch1", { db: fakeDb().db, env, fetcher: refusal, authenticate: asS1 })).json()).grading.fallbackReason, "refusal");
 
-  const noKey = await (await handleSubmitChallenge(submit(designAnswers), "ch1", { db: fakeDb().db, env: { NODE_ENV: "test" }, fetcher: unexpectedClaude })).json();
+  const noKey = await (await handleSubmitChallenge(submit(designAnswers), "ch1", { db: fakeDb().db, env: { NODE_ENV: "test" }, fetcher: unexpectedClaude, authenticate: asS1 })).json();
   assert.equal(noKey.grading.fallbackReason, "not_configured");
   assert.equal(noKey.submission.score.total, 7);
 });
 
 test("submit: rejects incomplete or mismatched answers without calling Claude or saving", async () => {
   const { db, submissions } = fakeDb();
-  const deps = { db, env, fetcher: unexpectedClaude };
+  const deps = { db, env, fetcher: unexpectedClaude, authenticate: asS1 };
   const tooShort = designAnswers.map((a) => ({ ...a, reasoning: "몰라" }));
   assert.equal((await handleSubmitChallenge(submit(tooShort), "ch1", deps)).status, 400);
   const noCorrection = designAnswers.map((a) => (a.claimId === "ch1-b" ? { ...a, correction: undefined } : a));
@@ -202,7 +213,7 @@ test("submit: rejects incomplete or mismatched answers without calling Claude or
 test("direct answer attempts are re-detected on the server and drive the process penalty", async () => {
   const { db, attempts } = fakeDb();
   const record = (text: string) => handleRecordDirectAnswer(post("/api/student/direct-answer-attempts",
-    { userId: "s1", courseId: "phil", conversationId: "conv-1", text, matched: "조작된 값", at: "2026-10-03T00:00:00Z" }), { db, env });
+    { courseId: "phil", conversationId: "conv-1", text, matched: "조작된 값", at: "2026-10-03T00:00:00Z" }), { db, env, authenticate: asS1 });
   assert.equal((await record("이데아론을 쉽게 설명해줘")).status, 400);
   const saved = await record("정답 번호만 해설 없이 알려줘");
   assert.equal(saved.status, 201);
@@ -210,29 +221,30 @@ test("direct answer attempts are re-detected on the server and drive the process
 
   // 학생 화면이 directAnswerFlag를 false로 보내도 서버 기록으로 판단. 이유를 붙여넣기로만 채우면 -2
   const pasted = designAnswers.map((a) => ({ ...a, pastedChars: a.reasoning.length }));
-  const body = await (await handleSubmitChallenge(submit(pasted), "ch1", { db, env, fetcher: claudeReturning(allTwos) })).json();
+  const body = await (await handleSubmitChallenge(submit(pasted), "ch1", { db, env, fetcher: claudeReturning(allTwos), authenticate: asS1 })).json();
   assert.equal(body.submission.directAnswerFlag, true);
   assert.equal(body.submission.score.penalty, -2);
   assert.equal(body.submission.score.total, 5);
   // 다음 제출에서는 이전 제출 뒤의 시도만 센다
-  const next = await (await handleSubmitChallenge(submit(pasted), "ch1", { db, env, fetcher: claudeReturning(allTwos) })).json();
+  const next = await (await handleSubmitChallenge(submit(pasted), "ch1", { db, env, fetcher: claudeReturning(allTwos), authenticate: asS1 })).json();
   assert.equal(next.submission.directAnswerFlag, false);
 });
 
 test("after-explanation updates only the student's own submission; records hide professor fields", async () => {
   const { db } = fakeDb();
-  const created = await (await handleSubmitChallenge(submit(designAnswers), "ch1", { db, env, fetcher: claudeReturning(allTwos) })).json();
+  const created = await (await handleSubmitChallenge(submit(designAnswers), "ch1", { db, env, fetcher: claudeReturning(allTwos), authenticate: asS1 })).json();
   const id = created.submission.id;
+  // userId를 본문에 넣어도 무시하고, 로그인한 계정 기준으로만 수정한다
   const patch = (userId: string, afterExplanation: unknown) =>
-    handleUpdateSubmission(post(`/api/student/submissions/${id}`, { userId, afterExplanation }, "PATCH"), id, { db, env });
+    handleUpdateSubmission(post(`/api/student/submissions/${id}`, { userId: "s1", afterExplanation }, "PATCH"), id, { db, env, authenticate: async () => sessionOf(userId) });
   assert.equal((await patch("s2", "이데아가 진짜 실재다.")).status, 404);
   assert.equal((await patch("s1", "   ")).status, 400);
   const ok = await patch("s1", "이데아는 변하지 않는 본질, 현실은 모방이다.");
   assert.equal(ok.status, 200);
   assert.equal((await ok.json()).submission.afterExplanation, "이데아는 변하지 않는 본질, 현실은 모방이다.");
-  assert.equal((await handleUpdateSubmission(post("/api/student/submissions/not-a-uuid", { userId: "s1", afterExplanation: "x" }, "PATCH"), "not-a-uuid", { db, env })).status, 404);
+  assert.equal((await handleUpdateSubmission(post("/api/student/submissions/not-a-uuid", { afterExplanation: "x" }, "PATCH"), "not-a-uuid", { db, env, authenticate: asS1 })).status, 404);
 
-  const records = await (await handleGetRecords(get("/api/student/records?userId=s1"), { db, env })).json();
+  const records = await (await handleGetRecords(get("/api/student/records"), { db, env, authenticate: asS1 })).json();
   assert.equal(records.records.submissions.length, 1);
   assert.equal(records.records.submissions[0].professorComment, undefined);
   assert.equal(records.records.conversations.length, 0);
@@ -240,26 +252,37 @@ test("after-explanation updates only the student's own submission; records hide 
 
 test("retrieval is a 501 placeholder, demo reset calls resetDemo, production stays closed", async () => {
   const fake = fakeDb();
-  assert.equal((await handleSaveRetrieval(post("/api/student/retrievals", {}), { db: fake.db, env })).status, 501);
-  const reset = await handleDemoReset(post("/api/student/demo-reset", { userId: "s1" }), { db: fake.db, env });
+  assert.equal((await handleSaveRetrieval(post("/api/student/retrievals", {}), { db: fake.db, env, authenticate: asS1 })).status, 501);
+  const reset = await handleDemoReset(post("/api/student/demo-reset", {}), { db: fake.db, env, authenticate: asS1 });
   assert.equal(reset.status, 200);
   assert.equal(fake.resets(), 1);
-  assert.equal((await handleDemoReset(post("/api/student/demo-reset", { userId: "nobody" }), { db: fake.db, env })).status, 404);
+  assert.equal((await handleDemoReset(post("/api/student/demo-reset", {}), { db: fake.db, env, authenticate: async () => null })).status, 401);
 
   const prod = { ...env, NODE_ENV: "production" };
-  const closed = await handleGetChallenge(get("/api/student/challenges/ch1?userId=s1"), "ch1", { db: fake.db, env: prod });
+  const closed = await handleGetChallenge(get("/api/student/challenges/ch1"), "ch1", { db: fake.db, env: prod, authenticate: asS1 });
   assert.equal(closed.status, 503);
   assert.equal((await closed.json()).error.code, "STUDENT_API_DISABLED");
-  const open = await handleGetChallenge(get("/api/student/challenges/ch1?userId=s1"), "ch1", { db: fake.db, env: { ...prod, STUDENT_API_ENABLED: "true" } });
+  const open = await handleGetChallenge(get("/api/student/challenges/ch1"), "ch1", { db: fake.db, env: { ...prod, STUDENT_API_ENABLED: "true" }, authenticate: asS1 });
   assert.equal(open.status, 200);
 });
 
 test("request validation: content type, size, and JSON errors", async () => {
   const { db } = fakeDb();
-  const text = new Request("http://localhost/api/student/demo-reset", { method: "POST", headers: { "Content-Type": "text/plain" }, body: "{}" });
-  assert.equal((await handleDemoReset(text, { db, env })).status, 415);
-  const big = post("/api/student/demo-reset", { userId: "s1", pad: "x".repeat(40_000) });
-  assert.equal((await handleDemoReset(big, { db, env })).status, 413);
-  const broken = new Request("http://localhost/api/student/demo-reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{" });
-  assert.equal((await handleDemoReset(broken, { db, env })).status, 400);
+  const text = new Request("http://localhost/api/student/direct-answer-attempts", { method: "POST", headers: { "Content-Type": "text/plain" }, body: "{}" });
+  assert.equal((await handleRecordDirectAnswer(text, { db, env, authenticate: asS1 })).status, 415);
+  const big = post("/api/student/challenges/ch1/submissions", { pad: "x".repeat(40_000) });
+  assert.equal((await handleSubmitChallenge(big, "ch1", { db, env, authenticate: asS1 })).status, 413);
+  const broken = new Request("http://localhost/api/student/direct-answer-attempts", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{" });
+  assert.equal((await handleRecordDirectAnswer(broken, { db, env, authenticate: asS1 })).status, 400);
+});
+
+test("identity comes only from the login session; userId in the body is ignored", async () => {
+  const { db, submissions } = fakeDb();
+  const spoofed = await handleSubmitChallenge(submit(designAnswers, { userId: "s2" }), "ch1", { db, env, authenticate: asS1, fetcher: claudeReturning(allTwos) });
+  assert.equal(spoofed.status, 201);
+  assert.equal(submissions[0].studentId, "s1");
+  const asS2 = async () => sessionOf("s2");
+  const records = await (await handleGetRecords(get("/api/student/records?userId=s1"), { db, env, authenticate: asS2 })).json();
+  assert.equal(records.records.studentId, "s2");
+  assert.equal((await handleSubmitChallenge(submit(designAnswers), "ch1", { db, env, authenticate: async () => null, fetcher: unexpectedClaude })).status, 401);
 });

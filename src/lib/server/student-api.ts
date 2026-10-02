@@ -1,16 +1,20 @@
 import 'server-only';
+import type { Session } from '../../types/session.ts';
 import type { ChallengeSubmission, ClaimAnswer, DirectAnswerAttempt, StudentRecords } from '../../types/student-records.ts';
 import type { GradingChallengeResult, PublicChallengeResult } from '../db/challenges.ts';
 import type { Student, SubmissionRecord } from '../db/types.ts';
 import { buildGradedSubmission, type GradingClaim } from '../challengeGrading.ts';
 import { inputProgress } from '../challengeInput.ts';
 import { detectDirectAnswer, hasDirectAnswerSince } from '../directAnswer.ts';
+import { AUTH_COOKIE, verifyAccess } from './auth.ts';
 import { gradeItemsWithClaude } from './grade-challenge.ts';
 
 // 학생 API(/api/student/*) 처리 로직. 계약: src/features/student/services/store.types.ts "서버 API 계약", docs/STUDENT_RECORDS.md
 // - DB는 src/lib/db 함수만 쓴다. 라우트가 실제 함수를 넣고, 테스트는 가짜 DB를 넣는다(StudentDb).
 // - 오류 형식은 /api/chat과 같다: HTTP 상태 + { ok: false, error: { code, message } }
-// - 인증이 아직 없어 학생은 userId로 식별한다. 운영(production)에서는 STUDENT_API_ENABLED=true일 때만 연다.
+// - 학생 식별: 로그인 쿠키 세션(src/lib/server/auth.ts verifyAccess)의 app_user_id. 요청의 userId는 쓰지 않는다.
+//   src/proxy.ts가 로그인·역할·같은 출처(변경 요청)를 먼저 확인하고, 여기서 다시 확인해 학생 id를 얻는다.
+// - 공개 배포 전 요청 제한이 없어 운영(production)에서는 STUDENT_API_ENABLED=true일 때만 연다.
 
 /** 학생 API가 쓰는 DB 함수 (src/lib/db의 같은 이름 함수) */
 export interface StudentDb {
@@ -28,6 +32,8 @@ export interface StudentDb {
 
 export interface StudentApiDeps {
   db: StudentDb;
+  /** 로그인 세션 확인 (기본: 쿠키 setask-access → verifyAccess). 테스트에서 대체 */
+  authenticate?: (request: Request, env: Record<string, string | undefined>) => Promise<Session | null>;
   env?: Record<string, string | undefined>;
   /** Claude 호출용 (테스트에서 대체) */
   fetcher?: typeof fetch;
@@ -116,12 +122,38 @@ async function guarded(deps: StudentApiDeps, run: (env: Record<string, string | 
   }
 }
 
-async function requireStudent(db: StudentDb, userId: unknown): Promise<Student | Response> {
-  if (typeof userId !== 'string' || !ID_PATTERN.test(userId)) {
-    return fail(400, 'INVALID_USER', '학생 정보(userId)를 확인해 주세요.');
+function cookieValue(request: Request, name: string): string | undefined {
+  for (const part of (request.headers.get('cookie') ?? '').split(';')) {
+    const index = part.indexOf('=');
+    if (index > 0 && part.slice(0, index).trim() === name) {
+      try {
+        return decodeURIComponent(part.slice(index + 1).trim());
+      } catch {
+        return undefined;
+      }
+    }
   }
-  const student = await db.getStudent(userId);
-  return student ?? fail(404, 'STUDENT_NOT_FOUND', '학생 정보를 찾을 수 없어요.');
+  return undefined;
+}
+
+/** 기본 인증: 로그인 쿠키의 access token을 Supabase Auth로 다시 확인한다 */
+function sessionFromCookie(request: Request, env: Record<string, string | undefined>): Promise<Session | null> {
+  return verifyAccess(cookieValue(request, AUTH_COOKIE), env);
+}
+
+/** 로그인한 학생 계정(app_user_id)을 학생 명부에서 찾는다 */
+async function requireStudent(
+  deps: StudentApiDeps,
+  request: Request,
+  env: Record<string, string | undefined>,
+): Promise<Student | Response> {
+  const session = await (deps.authenticate ?? sessionFromCookie)(request, env);
+  if (!session) return fail(401, 'UNAUTHORIZED', '로그인이 필요해요. 다시 로그인해 주세요.');
+  if (session.role !== 'student' || !ID_PATTERN.test(session.userId)) {
+    return fail(403, 'FORBIDDEN', '학생 계정으로 로그인해야 쓸 수 있어요.');
+  }
+  const student = await deps.db.getStudent(session.userId);
+  return student ?? fail(404, 'STUDENT_NOT_FOUND', '로그인한 계정이 학생 명부에 없어요. 관리자에게 문의해 주세요.');
 }
 
 const NOT_FOUND = () => fail(404, 'CHALLENGE_NOT_FOUND', '챌린지를 찾을 수 없어요.');
@@ -139,11 +171,11 @@ function toStudentSubmission(record: SubmissionRecord): ChallengeSubmission {
   return submission;
 }
 
-/* ───────────── 1. GET /api/student/challenges/{challengeId}?userId= ───────────── */
+/* ───────────── 1. GET /api/student/challenges/{challengeId} ───────────── */
 
 export function handleGetChallenge(request: Request, challengeId: string, deps: StudentApiDeps) {
-  return guarded(deps, async () => {
-    const student = await requireStudent(deps.db, new URL(request.url).searchParams.get('userId'));
+  return guarded(deps, async (env) => {
+    const student = await requireStudent(deps, request, env);
     if (student instanceof Response) return student;
     if (!ID_PATTERN.test(challengeId)) return NOT_FOUND();
     const result = await deps.db.getPublicChallenge(challengeId);
@@ -178,14 +210,14 @@ function parseAnswer(value: unknown): ClaimAnswer | null {
 
 export function handleSubmitChallenge(request: Request, challengeId: string, deps: StudentApiDeps) {
   return guarded(deps, async (env) => {
+    const student = await requireStudent(deps, request, env);
+    if (student instanceof Response) return student;
     const body = await readJson(request);
     if (!body.ok) return body.response;
     const input = body.value;
     if (!object(input) || !Array.isArray(input.answers) || input.answers.length > 20 || typeof input.directAnswerFlag !== 'boolean') {
       return fail(400, 'INVALID_INPUT', '제출 형식을 확인해 주세요.');
     }
-    const student = await requireStudent(deps.db, input.userId);
-    if (student instanceof Response) return student;
     if (!ID_PATTERN.test(challengeId)) return NOT_FOUND();
 
     const answers = input.answers.map(parseAnswer);
@@ -279,13 +311,13 @@ export function handleSubmitChallenge(request: Request, challengeId: string, dep
 /* ───────────── 3. PATCH /api/student/submissions/{submissionId} ───────────── */
 
 export function handleUpdateSubmission(request: Request, submissionId: string, deps: StudentApiDeps) {
-  return guarded(deps, async () => {
+  return guarded(deps, async (env) => {
+    const student = await requireStudent(deps, request, env);
+    if (student instanceof Response) return student;
     const body = await readJson(request);
     if (!body.ok) return body.response;
     const input = body.value;
     if (!object(input)) return fail(400, 'INVALID_INPUT', '요청 형식을 확인해 주세요.');
-    const student = await requireStudent(deps.db, input.userId);
-    if (student instanceof Response) return student;
     const text = typeof input.afterExplanation === 'string' ? input.afterExplanation.trim() : '';
     if (!text || text.length > MAX_TEXT) return fail(400, 'INVALID_INPUT', '해설 후 내 설명을 1~1,000자로 적어 주세요.');
     if (!UUID_PATTERN.test(submissionId)) return fail(404, 'SUBMISSION_NOT_FOUND', '제출 기록을 찾을 수 없어요.');
@@ -294,11 +326,11 @@ export function handleUpdateSubmission(request: Request, submissionId: string, d
   });
 }
 
-/* ───────────── 4. GET /api/student/records?userId= ───────────── */
+/* ───────────── 4. GET /api/student/records ───────────── */
 
 export function handleGetRecords(request: Request, deps: StudentApiDeps) {
-  return guarded(deps, async () => {
-    const student = await requireStudent(deps.db, new URL(request.url).searchParams.get('userId'));
+  return guarded(deps, async (env) => {
+    const student = await requireStudent(deps, request, env);
     if (student instanceof Response) return student;
     const records = await deps.db.getStudentRecords(student.id);
     return json({
@@ -311,13 +343,13 @@ export function handleGetRecords(request: Request, deps: StudentApiDeps) {
 /* ───────────── 5. POST /api/student/direct-answer-attempts ───────────── */
 
 export function handleRecordDirectAnswer(request: Request, deps: StudentApiDeps) {
-  return guarded(deps, async () => {
+  return guarded(deps, async (env) => {
+    const student = await requireStudent(deps, request, env);
+    if (student instanceof Response) return student;
     const body = await readJson(request);
     if (!body.ok) return body.response;
     const input = body.value;
     if (!object(input)) return fail(400, 'INVALID_INPUT', '요청 형식을 확인해 주세요.');
-    const student = await requireStudent(deps.db, input.userId);
-    if (student instanceof Response) return student;
     const { courseId, conversationId, text } = input;
     if (typeof courseId !== 'string' || !ID_PATTERN.test(courseId) || typeof conversationId !== 'string' ||
       !conversationId.trim() || conversationId.length > 100 || typeof text !== 'string' || !text.trim() || text.length > 4_000) {
@@ -341,19 +373,19 @@ export function handleRecordDirectAnswer(request: Request, deps: StudentApiDeps)
 
 /* ───────────── 6. POST /api/student/retrievals (자리만) ───────────── */
 
-export function handleSaveRetrieval(_request: Request, deps: StudentApiDeps) {
-  return guarded(deps, async () => fail(501, 'NOT_IMPLEMENTED', '재인출 퀴즈 저장은 아직 준비 중이에요.'));
+export function handleSaveRetrieval(request: Request, deps: StudentApiDeps) {
+  return guarded(deps, async (env) => {
+    const student = await requireStudent(deps, request, env);
+    if (student instanceof Response) return student;
+    return fail(501, 'NOT_IMPLEMENTED', '재인출 퀴즈 저장은 아직 준비 중이에요.');
+  });
 }
 
 /* ───────────── 7. POST /api/student/demo-reset ───────────── */
 
 export function handleDemoReset(request: Request, deps: StudentApiDeps) {
-  return guarded(deps, async () => {
-    const body = await readJson(request);
-    if (!body.ok) return body.response;
-    const input = body.value;
-    if (!object(input)) return fail(400, 'INVALID_INPUT', '요청 형식을 확인해 주세요.');
-    const student = await requireStudent(deps.db, input.userId);
+  return guarded(deps, async (env) => {
+    const student = await requireStudent(deps, request, env);
     if (student instanceof Response) return student;
     await deps.db.resetDemo(student.id);
     return json({ ok: true });
