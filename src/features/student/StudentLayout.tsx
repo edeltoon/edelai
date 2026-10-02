@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { AppShell, type SidebarSection } from '@/components/shell';
 import type { Session } from '@/types/session';
 import { COURSES, PHIL_COURSE_ID } from './content/courses';
+import { DemoResetContent, DemoResetProvider } from './DemoReset';
 import { DemoResetButton } from './DemoResetButton';
 import { LogoutButton } from '@/features/login/LogoutButton';
 import { useStoreQuery } from './hooks/useStoreQuery';
@@ -62,7 +63,7 @@ function StudentShell({ session, children }: { session: Session; children: React
         user: { name: session.name, caption: '학생' },
       }}
     >
-      {children}
+      <DemoResetContent>{children}</DemoResetContent>
     </AppShell>
   );
 }
@@ -71,7 +72,9 @@ function StudentShell({ session, children }: { session: Session; children: React
 export function StudentLayout({ session, children }: { session: Session; children: ReactNode }) {
   return (
     <StudentSessionProvider value={session}>
-      <StudentShell session={session}>{children}</StudentShell>
+      <DemoResetProvider studentId={session.userId}>
+        <StudentShell session={session}>{children}</StudentShell>
+      </DemoResetProvider>
     </StudentSessionProvider>
   );
 }
