@@ -19,6 +19,7 @@
 | server 구현 (`/api/student/*` 호출) | `src/features/student/services/store.server.ts`, `serverApi.ts` |
 | 자유 학습 AI (`/api/chat`) | `src/features/student/services/ai.ts`, `ai.live.ts`, `ai.types.ts` |
 | 세션 타입 (확정) / 학생 기록 타입 / 콘텐츠 타입 | `src/types/session.ts`, `student-records.ts`, `content.ts` |
+| 로그인 세션 확인 (HttpOnly 쿠키, 교수 담당 PR #14) | `src/lib/server/auth.ts`, `src/proxy.ts`, `docs/AUTH.md` |
 | 점수·지표 계산 (순수 함수, 서버 채점에서도 그대로 사용 가능) | `src/lib/scoring.ts`, `calibration.ts`, `reasoning.ts`, `challengeInput.ts`, `directAnswer.ts`, `schedule.ts` |
 
 ## 1. 학생 쪽 전환 방법 (`NEXT_PUBLIC_STORE_MODE`)
@@ -46,21 +47,28 @@ NEXT_PUBLIC_STORE_MODE=local
 
 타입은 `store.types.ts`의 "서버 API 계약"에 있고, 경로 목록은 `studentApi`입니다.
 처리 로직은 `src/lib/server/student-api.ts`, 라우트는 `src/app/api/student/**/route.ts`, 테스트는 `tests/student-api.test.ts`입니다. DB는 `src/lib/db` 함수만 씁니다.
-- **학생 식별**: 실제 인증이 아직 없으므로 세션의 `userId`(예: `s1`)를 보냅니다. GET은 쿼리, POST·PATCH는 본문에 넣습니다. 인증이 생기면 서버가 세션에서 꺼내고 이 값은 무시해도 됩니다.
+- **학생 식별: 로그인 세션**
+  - 학번으로 로그인하면 HttpOnly 쿠키(`setask-access`)가 생깁니다.
+  - 서버는 그 계정의 Supabase Auth `app_metadata.app_user_id`(예: `s1`)를 학생 id로 씁니다. 이 값이 `students.id`와 같아야 합니다.
+  - **요청에 `userId`를 보내지 않습니다.** 쿼리나 본문에 넣어도 무시합니다.
+  - 같은 출처의 `fetch`는 쿠키를 자동으로 싣습니다.
+- **로그인·권한 오류**
+  - `src/proxy.ts`가 먼저 확인합니다. 로그인 없음 401 `UNAUTHORIZED`, 학생 계정이 아님 403 `FORBIDDEN`이고, POST·PATCH는 같은 출처(`Origin`)가 아니면 403 `INVALID_ORIGIN`입니다.
+  - 학생 API도 쿠키를 다시 확인해 같은 코드로 응답합니다.
 - **오류 형식**: `/api/chat`과 같습니다. HTTP 상태 코드 + `{ ok: false, error: { code, message } }`. `message`는 학생에게 그대로 보이므로 해요체 한국어로 씁니다.
 - **성공 형식**: `{ ok: true, ... }`
-- **운영 환경**: 인증이 아직 없어 `NODE_ENV=production`에서는 `STUDENT_API_ENABLED=true`일 때만 열립니다(아니면 503 `STUDENT_API_DISABLED`). 개발 서버는 상관없습니다.
-- **학생 확인**: `userId`가 `students` 테이블에 없으면 404 `STUDENT_NOT_FOUND`입니다.
+- **운영 환경**: 로그인은 생겼지만 공개 배포용 요청 제한이 아직 없어 `NODE_ENV=production`에서는 `STUDENT_API_ENABLED=true`일 때만 열립니다(아니면 503 `STUDENT_API_DISABLED`). 개발 서버는 상관없습니다.
+- **학생 명부 확인**: 로그인한 계정의 `app_user_id`가 `students` 테이블에 없으면 404 `STUDENT_NOT_FOUND`입니다(관리자가 계정 `app_metadata`와 명부를 맞춰야 함).
 
 | # | 메서드·경로 | 요청 | 성공 응답 | 비고 |
 |---|---|---|---|---|
-| 1 | `GET /api/student/challenges/{challengeId}?userId=` | — | `{ ok, challenge: ChallengePublic }` | **교수 승인 오류 카드로 만든 챌린지만.** 오류 개수(`errorCount`)만 있고 오류 위치·정답·`errorCardId`는 없음. 404 `CHALLENGE_NOT_FOUND`, 409 `CHALLENGE_NOT_APPROVED` |
-| 2 | `POST /api/student/challenges/{challengeId}/submissions` | `SubmitChallengeRequest` (`userId`, `courseId`, `answers`, `directAnswerFlag`, `startedAt`) | 201 `{ ok, submission: ChallengeSubmission, grading: { method, fallbackReason?, model? } }` | 서버가 채점·저장. 이 응답에서 처음으로 정답·해설 포함. 입력 미완성 400 `INCOMPLETE_SUBMISSION`, 승인 전 409. 채점은 아래 "서버 채점" |
-| 3 | `PATCH /api/student/submissions/{submissionId}` | `{ userId, afterExplanation }` (1~1,000자) | `{ ok, submission }` | 해설 후 내 설명. 본인 제출만 수정(다른 학생이면 404) |
-| 4 | `GET /api/student/records?userId=` | — | `{ ok, records: StudentRecords }` | 제출·정답 직행 시도·재인출. 교수 조정·확정 필드는 빼고 보냄. 대화 기록은 빈 배열(결정 1) |
-| 5 | `POST /api/student/direct-answer-attempts` | `{ userId, courseId, conversationId, text }` | 201 `{ ok, attempt: DirectAnswerAttempt }` | 정답 직행 요청 기록 (감점 아님). **걸린 표현(`matched`)과 시각(`at`)은 서버가 정함** — 화면이 보낸 값은 쓰지 않고, 직행 요청이 아니면 400 `NOT_DIRECT_ANSWER` |
+| 1 | `GET /api/student/challenges/{challengeId}` | — | `{ ok, challenge: ChallengePublic }` | **교수 승인 오류 카드로 만든 챌린지만.** 오류 개수(`errorCount`)만 있고 오류 위치·정답·`errorCardId`는 없음. 404 `CHALLENGE_NOT_FOUND`, 409 `CHALLENGE_NOT_APPROVED` |
+| 2 | `POST /api/student/challenges/{challengeId}/submissions` | `SubmitChallengeRequest` (`courseId`, `answers`, `directAnswerFlag`, `startedAt`) | 201 `{ ok, submission: ChallengeSubmission, grading: { method, fallbackReason?, model? } }` | 서버가 채점·저장. 이 응답에서 처음으로 정답·해설 포함. 입력 미완성 400 `INCOMPLETE_SUBMISSION`, 승인 전 409. 채점은 아래 "서버 채점" |
+| 3 | `PATCH /api/student/submissions/{submissionId}` | `{ afterExplanation }` (1~1,000자) | `{ ok, submission }` | 해설 후 내 설명. 로그인한 학생 본인의 제출만 수정(아니면 404) |
+| 4 | `GET /api/student/records` | — | `{ ok, records: StudentRecords }` | 제출·정답 직행 시도·재인출. 교수 조정·확정 필드는 빼고 보냄. 대화 기록은 빈 배열(결정 1) |
+| 5 | `POST /api/student/direct-answer-attempts` | `{ courseId, conversationId, text }` | 201 `{ ok, attempt: DirectAnswerAttempt }` | 정답 직행 요청 기록 (감점 아님). **걸린 표현(`matched`)과 시각(`at`)은 서버가 정함** — 화면이 보낸 값은 쓰지 않고, 직행 요청이 아니면 400 `NOT_DIRECT_ANSWER` |
 | 6 | `POST /api/student/retrievals` | `SaveRetrievalRequest` | 지금은 501 `NOT_IMPLEMENTED` | 재인출 퀴즈 결과. 자리만 있음(첫 목표 이후 구현, DB 함수 `insertRetrieval`은 있음) |
-| 7 | `POST /api/student/demo-reset` | `{ userId }` | `{ ok }` | 시연 리셋(`resetDemo`): 이 학생의 제출·시도·재인출 삭제 + 시연 카드 `ec-idea-1`을 승인 대기로 |
+| 7 | `POST /api/student/demo-reset` | `{}` | `{ ok }` | 시연 리셋(`resetDemo`): 로그인한 학생의 제출·시도·재인출 삭제 + 시연 카드 `ec-idea-1`을 승인 대기로 |
 
 ### 서버 채점 (POST 제출)
 - **규칙(src/lib)**: 판정 정오, 오탐 주장 이유 0점, 오류를 놓치면 개념·근거 0점, 근거 일치, 과정 감점(−2), 합계, 확신도 보정. local mock과 같은 함수(`src/lib/challengeGrading.ts`)로 계산합니다.
@@ -75,6 +83,11 @@ NEXT_PUBLIC_STORE_MODE=local
 
 교수 화면용 API(오류 카드 승인·반려, 학생 목록·기록 조회, 평가 확정)는 교수 담당이 만들고, DB 함수(`src/lib/db/`)는 학생 담당이 공유합니다.
 교수 화면이 학생 기록을 읽을 때는 아래 3장의 `ChallengeSubmission` 필드를 쓰면 됩니다.
+
+### 시험 호출 (로그인 이후)
+브라우저 밖에서 부를 때는 로그인 쿠키와 같은 출처 `Origin` 헤더가 필요합니다.
+1. `POST /api/auth/login`으로 쿠키를 받습니다(`docs/AUTH.md`).
+2. 학생 API를 부를 때 `Cookie: setask-access=…`와 `Origin: http://localhost:3000`을 함께 보냅니다.
 
 ### 결정 사항 (2026-10-03)
 1. **대화 기록**: 첫 목표에서는 브라우저(localStorage)에 둡니다. 서버 저장은 교수 "원문 열람"이 필요해질 때 `POST/GET /api/student/conversations`를 추가하고 `store.server.ts`의 대화 메서드 3개만 바꿉니다.
@@ -112,7 +125,7 @@ NEXT_PUBLIC_STORE_MODE=local
 
 | 키 | 타입 | 내용 |
 |---|---|---|
-| `edeltoon:session` | `Session` | 역할 선택 화면이 저장 (`src/lib/session.ts`) |
+| `edeltoon:session` | `Session` | 로그인 화면이 표시 호환용으로 저장하고 로그아웃 때 지움 (`src/lib/session.ts`). **학생 식별·권한에는 쓰지 않음** — 학생 화면은 서버가 확인한 쿠키 세션만 씀 |
 | `edeltoon:student-index` | `string[]` | 기록이 있는 학생 id 목록 |
 | `edeltoon:student:{studentId}:conversations` | `Conversation[]` | 자유 학습 대화 (server 모드에서도 여기) |
 | `edeltoon:student:{studentId}:direct-answer-attempts` | `DirectAnswerAttempt[]` | 정답 직행 요청 시도 |
