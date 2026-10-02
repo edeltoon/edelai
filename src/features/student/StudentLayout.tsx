@@ -6,11 +6,11 @@ import { AppShell, type SidebarSection } from '@/components/shell';
 import type { Session } from '@/types/session';
 import { COURSES, PHIL_COURSE_ID } from './content/courses';
 import { DemoResetButton } from './DemoResetButton';
-import { DevSessionGate } from './DevSessionGate';
+import { LogoutButton } from '@/features/login/LogoutButton';
 import { useStoreQuery } from './hooks/useStoreQuery';
 import { courseIdOf, studentRoutes } from './routes';
 import { studentStore } from './services/store';
-import { StudentSessionProvider, useSessionState } from './StudentSession';
+import { StudentSessionProvider } from './StudentSession';
 
 const RECENT_LIMIT = 8;
 
@@ -55,11 +55,11 @@ function StudentShell({ session, children }: { session: Session; children: React
 
   return (
     <AppShell
-      header={{ spaceName: 'AI 학습 공간', role: 'student', userName: session.name, actions: <DemoResetButton /> }}
+      header={{ spaceName: 'AI 학습 공간', role: 'student', userName: session.name, actions: <><DemoResetButton /><LogoutButton /></> }}
       sidebar={{
         primaryAction: { label: '새 대화', href: studentRoutes.freeStudy(recentCourseId) },
         sections,
-        user: { name: session.name, caption: '학생 · 데모' },
+        user: { name: session.name, caption: '학생' },
       }}
     >
       {children}
@@ -67,19 +67,11 @@ function StudentShell({ session, children }: { session: Session; children: React
   );
 }
 
-/** 학생 화면 공통: 학생 세션 확인 → 셸(헤더·사이드바) → 본문 */
-export function StudentLayout({ children }: { children: ReactNode }) {
-  const state = useSessionState();
-
-  if (state.status === 'loading') {
-    return <div className="min-h-dvh bg-page" aria-busy="true" />;
-  }
-  if (state.status === 'none' || state.session.role !== 'student') {
-    return <DevSessionGate current={state.status === 'ready' ? state.session : null} />;
-  }
+/** 서버가 확인한 학생 계정으로 셸과 저장소 사용자 ID를 연결한다. */
+export function StudentLayout({ session, children }: { session: Session; children: ReactNode }) {
   return (
-    <StudentSessionProvider value={state.session}>
-      <StudentShell session={state.session}>{children}</StudentShell>
+    <StudentSessionProvider value={session}>
+      <StudentShell session={session}>{children}</StudentShell>
     </StudentSessionProvider>
   );
 }

@@ -1,11 +1,12 @@
 import Link from 'next/link';
+import { LogoutButton } from '../login/LogoutButton';
 import type { ReactNode } from 'react';
 import { AppShell, SpaceTitleBar } from '@/components/shell';
 
 export function ProfessorShell({ active, children }: { active: 'cards' | 'records' | 'analysis'; children: ReactNode }) {
   const menus = [{ key: 'analysis', label: '수업 분석', href: '/professor/course/phil/analysis' }, { key: 'cards', label: '챌린지 관리', href: '/professor/course/phil/cards' },
     { key: 'records', label: '학생 기록', href: '/professor/course/phil/records' }];
-  return <AppShell header={{ spaceName: 'AI 교수 공간', role: 'professor', userName: '담당 교수' }} sidebar={{
+  return <AppShell header={{ spaceName: 'AI 교수 공간', role: 'professor', userName: '담당 교수', actions: <LogoutButton /> }} sidebar={{
     sections: [
       { key: 'courses', title: '나의 담당 과목', items: [{ key: 'phil', label: '서양철학:쟁점과토론', href: menus[0].href, active: true, icon: 'course' }] },
       { key: 'tools', title: '과목 관리', items: menus.map(item => ({ ...item, active: item.key === active })) },
