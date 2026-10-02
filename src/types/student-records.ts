@@ -66,8 +66,10 @@ export interface ClaimAnswer {
 
 export interface ScoreBreakdown {
   judgment: number; // 0~1
-  reasoning: number; // 0~2
-  concept: number; // 0~2
+  /** 0~2. null이면 AI 채점 실패로 "교수 채점 대기" */
+  reasoning: number | null;
+  /** 0~2. null이면 AI 채점 실패로 "교수 채점 대기" */
+  concept: number | null;
   evidence: number; // 0~2
   penalty: number; // 0 또는 -2
   total: number; // 0~7
@@ -77,7 +79,8 @@ export interface ClaimGrade {
   claimId: string;
   isError: boolean;
   judgmentCorrect: boolean;
-  reasoningScore: number; // 0~2
+  /** 0~2. null이면 "교수 채점 대기" (AI 채점 실패) */
+  reasoningScore: number | null;
   explanation: string;
   feedback?: string;
 }
@@ -89,7 +92,8 @@ export interface ErrorReveal {
   explanation: string;
   evidenceId: string;
   evidenceLabel: string;
-  conceptScore: number; // 0~2
+  /** 0~2. null이면 "교수 채점 대기" (AI 채점 실패) */
+  conceptScore: number | null;
   evidenceScore: number; // 0~2
 }
 
@@ -103,6 +107,11 @@ export interface ChallengeSubmission {
   submittedAt: string;
   /** 채점 주체. 'mock'은 학생 화면의 시연용 예시 채점(키워드 규칙), 'server'는 서버 API 채점 */
   grader: 'mock' | 'server';
+  /**
+   * AI 채점이 실패해 교수 채점을 기다리는 항목. 비어 있으면 채점 완료.
+   * 판정·근거·과정 감점 같은 규칙 기반 점수는 이 경우에도 저장된다.
+   */
+  pendingReview: ('reasoning' | 'concept')[];
   answers: ClaimAnswer[];
   /** 직전 제출 이후 같은 과목의 정답 직행 시도 여부 */
   directAnswerFlag: boolean;

@@ -9,6 +9,7 @@ import {
   countFalseAlarms,
   errorClaimPoint,
   isFalseAlarm,
+  pendingReviewItems,
   judgmentPoint,
   processPenalty,
   reasoningPoint,
@@ -59,6 +60,7 @@ export async function submitChallengeMock(
 
   const claimGrades: ClaimGrade[] = [];
   const errorReveals: ErrorReveal[] = [];
+  const reasoningScores: number[] = [];
   const conceptScores: number[] = [];
   const evidenceScores: number[] = [];
 
@@ -68,6 +70,7 @@ export async function submitChallengeMock(
     const truth = k.isError ? 'wrong' : 'correct';
     const falseAlarm = isFalseAlarm(k.isError, answer.judgment);
     const reasoningScore = claimReasoningScore(keywordReasonScore(answer.reasoning, key.reasonKeywords), k.isError, answer.judgment);
+    reasoningScores.push(reasoningScore);
     claimGrades.push({
       claimId: answer.claimId,
       isError: k.isError,
@@ -106,7 +109,7 @@ export async function submitChallengeMock(
   const pastedRatio = pastedReasonRatio(answers);
   const score = totalScore({
     judgment: judgmentPoint(claimGrades.map((g) => g.judgmentCorrect)),
-    reasoning: reasoningPoint(claimGrades.map((g) => g.reasoningScore)),
+    reasoning: reasoningPoint(reasoningScores),
     concept: errorClaimPoint(conceptScores),
     evidence: errorClaimPoint(evidenceScores),
     penalty: processPenalty(req.directAnswerFlag, pastedRatio),
@@ -132,6 +135,7 @@ export async function submitChallengeMock(
       answers,
       directAnswerFlag: req.directAnswerFlag,
       pastedRatio,
+      pendingReview: pendingReviewItems(score),
       falseAlarms: countFalseAlarms(claimGrades.map((g, i) => ({ isError: g.isError, judgment: answers[i].judgment }))),
       score,
       calibration,

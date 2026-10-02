@@ -1,11 +1,12 @@
-// 학생 화면 저장소 인터페이스와 서버 API 계약 (Supabase + 서버 API 라우트 기준).
+// 학생 화면 저장소 인터페이스와 학생 서버 API 계약 (Supabase + 서버 API 라우트 기준).
 //
 // 저장은 Supabase(Postgres)로 확정됐고, DB 접근은 서버 API 담당이 만드는 src/app/api/** 라우트에서만 한다.
 // 학생 화면은 DB를 모르고 StudentStore 인터페이스만 쓴다. 구현은 NEXT_PUBLIC_STORE_MODE로 고른다.
 //   local  (기본): store.local.ts. localStorage + 학생 화면 mock 채점. 노트북 한 대 시연용으로 끝까지 유지
 //   server       : store.server.ts. 아래 계약의 /api/student/* 를 호출. 실패는 오류로 보여주고 local로 대체하지 않음
 //
-// 이 파일의 "서버 API 계약" 부분은 서버 API 담당에게 "이 형태로 만들어 달라"고 요청하는 초안이다.
+// 이 파일의 "서버 API 계약"은 학생 API(/api/student/*)의 형태다. Supabase와 학생 API는 학생 화면 담당이
+// feat/supabase에서 구현한다(교수 API는 교수 담당이 같은 DB 계층으로 만든다).
 // 학생 식별: 실제 인증이 없으므로 세션의 userId(예: 's1')를 GET은 쿼리, POST/PATCH는 본문으로 보낸다.
 //           인증이 생기면 서버가 세션에서 꺼내고 이 필드는 무시해도 된다.
 // 오류 형식: /api/chat과 같다. HTTP 상태 코드 + { ok: false, error: { code, message } }
@@ -170,7 +171,9 @@ export interface SubmitChallengeRequest {
  * 서버가 채점하고 저장한 뒤 제출 기록 전체를 돌려준다(이때 처음으로 정답·해설 포함).
  * 채점 규칙(src/lib 순수 함수를 그대로 쓰면 학생 화면 local 모드와 결과가 같다):
  * - 판정 정오(규칙): 오류 주장이면 'wrong', 아니면 'correct'가 정답
- * - 본인 생각 0~2, 올바른 개념 0~2: AI 평가(Claude). 실패하면 오류로 응답(키워드 점수로 조용히 대체 금지)
+ * - 본인 생각 0~2, 올바른 개념 0~2: AI 평가(Claude). AI 채점이 실패해도 제출 전체를 실패시키지 않는다.
+ *   규칙 기반 점수(판정·근거·과정 감점)는 저장하고, 실패한 AI 항목만 null + pendingReview에 넣어 "교수 채점 대기"로 둔다.
+ *   (키워드 점수로 조용히 대체하지 않는다)
  *   단, 오탐(맞는 주장을 '틀리다')인 주장의 본인 생각 점수는 0 (scoring.claimReasoningScore)
  * - 근거 0/2(규칙): evidenceId === 오류 카드 evidenceId
  * - 합계: scoring.judgmentPoint / reasoningPoint / errorClaimPoint / processPenalty / totalScore

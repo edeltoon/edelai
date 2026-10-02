@@ -74,9 +74,21 @@ export function processPenalty(directAnswerFlag: boolean, pastedRatio: number): 
 
 /**
  * 합계 0~7. 감점으로 음수가 되면 0.
- * 예) {1,2,2,2,0} → 7, {0,1,0,0,-2} → 0, {1,2,2,2,-2} → 5
+ * AI 채점 항목(reasoning, concept)이 null(교수 채점 대기)이면 0으로 더한 "현재 점수"이고, 교수가 채점하면 다시 계산한다.
+ * 예) {1,2,2,2,0} → 7, {0,1,0,0,-2} → 0, {1,2,2,2,-2} → 5, {1,null,null,2,0} → 3
  */
 export function totalScore(parts: Omit<ScoreBreakdown, 'total'>): ScoreBreakdown {
-  const raw = parts.judgment + parts.reasoning + parts.concept + parts.evidence + parts.penalty;
+  const raw = parts.judgment + (parts.reasoning ?? 0) + (parts.concept ?? 0) + parts.evidence + parts.penalty;
   return { ...parts, total: Math.min(MAX_SCORE, Math.max(0, raw)) };
+}
+
+/**
+ * 교수 채점 대기 항목.
+ * 예) {reasoning:2, concept:2} → [], {reasoning:null, concept:2} → ['reasoning'], 둘 다 null → ['reasoning','concept']
+ */
+export function pendingReviewItems(parts: Pick<ScoreBreakdown, 'reasoning' | 'concept'>): ('reasoning' | 'concept')[] {
+  const items: ('reasoning' | 'concept')[] = [];
+  if (parts.reasoning === null) items.push('reasoning');
+  if (parts.concept === null) items.push('concept');
+  return items;
 }
