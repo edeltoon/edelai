@@ -101,8 +101,10 @@ export interface ChallengeSubmission {
   challengeId: string;
   conceptId: string;
   submittedAt: string;
+  /** 채점 주체. 'mock'은 학생 화면의 시연용 예시 채점(키워드 규칙), 'server'는 서버 API 채점 */
+  grader: 'mock' | 'server';
   answers: ClaimAnswer[];
-  /** 챌린지 시작 ~ 제출 사이 같은 과목의 정답 직행 시도 여부 */
+  /** 직전 제출 이후 같은 과목의 정답 직행 시도 여부 */
   directAnswerFlag: boolean;
   /** 이유 칸 중 붙여넣기로만 채워진 비율 0~1 */
   pastedRatio: number;
