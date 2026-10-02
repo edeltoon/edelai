@@ -5,7 +5,8 @@
 
 ## 0. 결정: Supabase + 서버 API로 확정
 
-- 저장소는 **Supabase(Postgres)**입니다. **DB 접근은 서버 API 라우트(`src/app/api/**`)에서만** 합니다(서버 API 담당).
+- 저장소는 **Supabase(Postgres)**입니다. **DB 접근은 서버 API 라우트(`src/app/api/**`)에서만** 합니다.
+- 담당: **Supabase(스키마·서버 DB 계층)와 학생 API(`/api/student/*`)는 학생 화면 담당**이 `feat/supabase`에서 구현합니다. 교수 API는 교수 담당이 같은 DB 계층 함수로 만듭니다.
 - 학생 화면은 DB를 모르고, `src/features/student/services/store.ts`의 `StudentStore` 인터페이스만 씁니다.
 - 비밀 값(`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` 등)은 `.env.local`에만 둡니다. `NEXT_PUBLIC_` 접두사는 쓰지 않습니다.
 - 학생 화면이 쓰는 공개 설정은 `NEXT_PUBLIC_STORE_MODE` 하나뿐입니다(비밀 아님).
@@ -22,7 +23,7 @@
 
 ## 1. 학생 쪽 전환 방법 (`NEXT_PUBLIC_STORE_MODE`)
 
-`.env.local`에 아래 줄을 두고 개발 서버를 재시작합니다. 없으면 `local`입니다.
+`.env.local`에 아래 줄을 두고 개발 서버를 재시작합니다. 없으면 `local`입니다. (`.env.example`에는 `feat/supabase`에서 이 이름을 추가합니다.)
 
 ```
 # 학생 기록 저장소: local(브라우저 저장 + 학생 화면 예시 채점, 기본) | server(/api/student/* 서버 API)
@@ -41,11 +42,11 @@ NEXT_PUBLIC_STORE_MODE=local
 - 시연 중 네트워크 문제가 생기면 `local`로 바꾸고 재시작합니다. 그 브라우저 안에서 학생·교수 화면을 함께 시연할 수 있습니다.
 - 자유 학습은 두 모드 모두 실제 `POST /api/chat`을 씁니다. 키가 없으면 안내 문구가 나옵니다.
 
-## 2. 서버 API 담당에게 요청할 엔드포인트
+## 2. 학생 API 엔드포인트 (feat/supabase에서 구현 예정)
 
 타입은 `store.types.ts`의 "서버 API 계약"에 있고, 경로 목록은 `studentApi`입니다.
 - **학생 식별**: 실제 인증이 아직 없으므로 세션의 `userId`(예: `s1`)를 보냅니다. GET은 쿼리, POST·PATCH는 본문에 넣습니다. 인증이 생기면 서버가 세션에서 꺼내고 이 값은 무시해도 됩니다.
-- **오류 형식**: `/api/chat`과 같습니다. HTTP 상태 코드 + `{ ok: false, error: { code, message } }`. `message`는 학생에게 그대로 보이므로 해요체 한국어로 써 주세요.
+- **오류 형식**: `/api/chat`과 같습니다. HTTP 상태 코드 + `{ ok: false, error: { code, message } }`. `message`는 학생에게 그대로 보이므로 해요체 한국어로 씁니다.
 - **성공 형식**: `{ ok: true, ... }`
 
 | # | 메서드·경로 | 요청 | 성공 응답 | 비고 |
@@ -58,22 +59,23 @@ NEXT_PUBLIC_STORE_MODE=local
 | 6 | `POST /api/student/retrievals` | `SaveRetrievalRequest` | `{ ok, retrieval: RetrievalResult }` | 재인출 퀴즈 결과 (첫 목표 이후) |
 | 7 | `POST /api/student/demo-reset` | `{ userId }` | `{ ok }` | 시연 리셋. 이 학생의 제출·시도·재인출 삭제 |
 
-교수 화면용 API(오류 카드 승인·반려, 학생 목록·기록 조회, 평가 확정)는 서버 API 담당이 정합니다.
+교수 화면용 API(오류 카드 승인·반려, 학생 목록·기록 조회, 평가 확정)는 교수 담당이 만들고, DB 함수(`src/lib/db/`, feat/supabase)는 학생 담당이 공유합니다.
 교수 화면이 학생 기록을 읽을 때는 아래 3장의 `ChallengeSubmission` 필드를 쓰면 됩니다.
 
-### 팀 결정이 필요한 질문
-1. **대화 기록을 서버에 둘까요?** 첫 목표에서는 브라우저(localStorage)에 두는 것을 제안합니다.
-   - 교수 "원문 열람"이 필요해지면 `POST /api/student/conversations`(upsert)와 `GET /api/student/conversations?userId=&courseId=`를 추가하면 됩니다.
-   - 그때 `store.server.ts`의 대화 메서드 3개만 바꾸면 화면 코드는 그대로입니다.
-2. **챌린지 id와 오류 카드 연결**: 학생 화면은 지금 `ch1`(`content/challenges.ts`)을 씁니다. 교수 승인 카드로 만든 챌린지의 id 규칙(`ch1` 유지 여부)을 정해 주세요.
-3. **AI 채점 실패 시 응답**: 본인 생각·개념 점수의 AI 평가가 실패하면 제출 전체를 오류(502 등)로 돌려줄지, 해당 항목만 "교수 채점 대기"로 둘지 정해 주세요. 학생 화면은 어느 쪽이든 받은 그대로 표시합니다.
+### 결정 사항 (2026-10-03)
+1. **대화 기록**: 첫 목표에서는 브라우저(localStorage)에 둡니다. 서버 저장은 교수 "원문 열람"이 필요해질 때 `POST/GET /api/student/conversations`를 추가하고 `store.server.ts`의 대화 메서드 3개만 바꿉니다.
+2. **챌린지 id**: `"ch1"` 같은 문자열 id를 그대로 DB 기본키로 씁니다. 시드도 `ch1`입니다.
+3. **AI 채점 실패**: 제출 전체를 실패시키지 않습니다.
+   - 규칙 기반 점수(판정·근거·과정 감점)는 저장합니다.
+   - AI 채점 항목(본인 생각·올바른 개념)만 `null`로 두고 `pendingReview`에 넣습니다. 화면에는 "교수 채점 대기"로 표시합니다.
+   - 이때 `score.total`은 대기 항목을 0으로 더한 현재 점수이고, 교수가 채점하면 다시 계산합니다(`scoring.totalScore`, `pendingReviewItems`).
 
 ## 3. 학생 기록 필드 (`ChallengeSubmission`, `src/types/student-records.ts`)
 
 | 필드 | 뜻 |
 |---|---|
 | `answers[]` | 주장별 판정(`judgment`), 확신도(`confidence` 0~100), 본인 생각(`reasoning`), 올바른 개념(`correction`), 근거(`evidenceId`), 붙여넣은 글자 수(`pastedChars`) |
-| `score` | `{ judgment 0~1, reasoning 0~2, concept 0~2, evidence 0~2, penalty 0/-2, total 0~7 }` |
+| `score` | `{ judgment 0~1, reasoning 0~2 \| null, concept 0~2 \| null, evidence 0~2, penalty 0/-2, total 0~7 }` (null = 교수 채점 대기) |
 | `calibration` | 확신도 보정 정확도 0~100 |
 | `falseAlarms` | 오탐 수. 맞는 주장을 '틀리다'로 판정한 개수이고, 그 주장의 이유 점수는 0 |
 | `claimGrades[]` | 주장별 오류 여부, 판정 정오, 본인 생각 점수, 해설 |
@@ -82,6 +84,7 @@ NEXT_PUBLIC_STORE_MODE=local
 | `beforeSummary`, `afterExplanation` | 해설 전 생각 요약 / 해설 후 내 설명 (설명 변화 비교) |
 | `retrievalScheduledAt` | 1주 뒤 재인출 예약 시각 |
 | `grader` | `'mock'`(local 모드 예시 채점) / `'server'` |
+| `pendingReview` | AI 채점 실패로 "교수 채점 대기"인 항목(`'reasoning'`, `'concept'`). 비어 있으면 채점 완료. 그 항목 점수는 `null` |
 
 점수 규칙(설계안 7점):
 - 판정 +1: 모든 주장을 맞게 판정했을 때만
