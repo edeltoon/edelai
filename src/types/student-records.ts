@@ -66,8 +66,10 @@ export interface ClaimAnswer {
 
 export interface ScoreBreakdown {
   judgment: number; // 0~1
-  reasoning: number; // 0~2
-  concept: number; // 0~2
+  /** 0~2. null이면 AI 채점 실패로 "교수 채점 대기" */
+  reasoning: number | null;
+  /** 0~2. null이면 AI 채점 실패로 "교수 채점 대기" */
+  concept: number | null;
   evidence: number; // 0~2
   penalty: number; // 0 또는 -2
   total: number; // 0~7
@@ -77,7 +79,8 @@ export interface ClaimGrade {
   claimId: string;
   isError: boolean;
   judgmentCorrect: boolean;
-  reasoningScore: number; // 0~2
+  /** 0~2. null이면 "교수 채점 대기" (AI 채점 실패) */
+  reasoningScore: number | null;
   explanation: string;
   feedback?: string;
 }
@@ -89,7 +92,8 @@ export interface ErrorReveal {
   explanation: string;
   evidenceId: string;
   evidenceLabel: string;
-  conceptScore: number; // 0~2
+  /** 0~2. null이면 "교수 채점 대기" (AI 채점 실패) */
+  conceptScore: number | null;
   evidenceScore: number; // 0~2
 }
 
@@ -101,11 +105,20 @@ export interface ChallengeSubmission {
   challengeId: string;
   conceptId: string;
   submittedAt: string;
+  /** 채점 주체. 'mock'은 학생 화면의 시연용 예시 채점(키워드 규칙), 'server'는 서버 API 채점 */
+  grader: 'mock' | 'server';
+  /**
+   * AI 채점이 실패해 교수 채점을 기다리는 항목. 비어 있으면 채점 완료.
+   * 판정·근거·과정 감점 같은 규칙 기반 점수는 이 경우에도 저장된다.
+   */
+  pendingReview: ('reasoning' | 'concept')[];
   answers: ClaimAnswer[];
-  /** 챌린지 시작 ~ 제출 사이 같은 과목의 정답 직행 시도 여부 */
+  /** 직전 제출 이후 같은 과목의 정답 직행 시도 여부 */
   directAnswerFlag: boolean;
   /** 이유 칸 중 붙여넣기로만 채워진 비율 0~1 */
   pastedRatio: number;
+  /** 오탐 수: 맞는 주장을 '틀리다'로 판정한 주장 개수 (그 주장의 이유 점수는 0) */
+  falseAlarms: number;
   score: ScoreBreakdown;
   /** 확신도 보정 정확도 0~100 */
   calibration: number;
