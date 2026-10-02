@@ -125,7 +125,7 @@ export function PendingAnswer() {
   return (
     <div className="space-y-2" role="status" aria-live="polite">
       <AiHeader />
-      <p className="pl-8 text-body text-ink-sub">답변을 쓰고 있어요. 보통 5~15초 걸려요.</p>
+      <p className="pl-8 text-body text-ink-sub">답변을 쓰고 있어요. 보통 10~20초 걸려요.</p>
     </div>
   );
 }
