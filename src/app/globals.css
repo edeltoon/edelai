@@ -58,6 +58,9 @@
   --text-title--line-height: 1.3;
   --text-display: 28px;
   --text-display--line-height: 1.3;
+  /* 서비스 이름 전용 (역할 선택 화면 Sejong Task). 다른 제목에는 쓰지 않는다 */
+  --text-hero: 32px;
+  --text-hero--line-height: 1.25;
 
   /* 모서리: 입력·버튼·배지 6px, 블록·카드 8px, 상태 배지만 완전 둥글게(rounded-full) */
   --radius-control: 6px;

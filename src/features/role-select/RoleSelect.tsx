@@ -79,7 +79,7 @@ export function RoleSelect() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-subtle px-4 py-10">
       <header className="mb-10 text-center">
-        <h1 className="whitespace-nowrap text-display font-bold tracking-tight text-ink">
+        <h1 className="whitespace-nowrap text-hero font-bold tracking-tight text-ink">
           <span className="text-sejong">Sejong</span> Task
         </h1>
         <p className="mt-2 text-lead text-ink">AI 오류 검증 기반 학습·평가 공간</p>
