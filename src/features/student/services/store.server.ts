@@ -25,8 +25,13 @@ function notifyChange() {
   window.dispatchEvent(new Event(STORE_CHANGE_EVENT));
 }
 
+/** 로그인한 학생의 서버 기록. 학생은 쿠키 세션으로 식별되므로 studentId는 확인용으로만 쓴다 */
 async function records(studentId: string) {
-  return unwrap(await getStudentRecordsFromServer(studentId)).records;
+  const result = unwrap(await getStudentRecordsFromServer()).records;
+  if (result.studentId !== studentId) {
+    throw new StoreError('SESSION_MISMATCH', '로그인한 계정이 바뀌었어요. 페이지를 새로고침해 주세요.');
+  }
+  return result;
 }
 
 export const serverStudentStore: StudentStore = {
@@ -40,12 +45,9 @@ export const serverStudentStore: StudentStore = {
   async addDirectAnswerAttempt(attempt) {
     unwrap(
       await recordDirectAnswerAttemptToServer({
-        userId: attempt.studentId,
         courseId: attempt.courseId,
         conversationId: attempt.conversationId,
         text: attempt.text,
-        matched: attempt.matched,
-        at: attempt.at,
       }),
     );
     notifyChange();
@@ -75,7 +77,6 @@ export const serverStudentStore: StudentStore = {
   async saveRetrieval(result: RetrievalResult) {
     unwrap(
       await saveRetrievalToServer({
-        userId: result.studentId,
         courseId: result.courseId,
         challengeId: result.challengeId,
         submissionId: result.submissionId,
@@ -104,7 +105,7 @@ export const serverStudentStore: StudentStore = {
   subscribe: (listener) => localStudentStore.subscribe(listener),
 
   async resetAll(studentId, options) {
-    unwrap(await demoResetOnServer({ userId: studentId }));
+    unwrap(await demoResetOnServer());
     await localStudentStore.resetAll(studentId, options);
   },
 };

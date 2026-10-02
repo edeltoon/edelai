@@ -1,5 +1,6 @@
 // 학생 서버 API(/api/student/*) 호출. 계약은 store.types.ts "서버 API 계약".
 // server 모드(NEXT_PUBLIC_STORE_MODE=server)에서만 쓰인다. 실패는 ApiError로 돌려주고 local로 대체하지 않는다.
+// 학생은 로그인 쿠키로 식별되므로 userId를 보내지 않는다(같은 출처 fetch가 쿠키를 자동으로 싣는다).
 import type {
   ApiError,
   DemoResetRequest,
@@ -57,8 +58,8 @@ const json = (method: 'POST' | 'PATCH', body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
-export function getChallengeFromServer(challengeId: string, userId: string) {
-  return requestJson<GetChallengeResponse>(`${studentApi.challenge(challengeId)}?userId=${encodeURIComponent(userId)}`);
+export function getChallengeFromServer(challengeId: string) {
+  return requestJson<GetChallengeResponse>(studentApi.challenge(challengeId));
 }
 
 export function submitChallengeToServer(challengeId: string, req: SubmitChallengeRequest) {
@@ -69,8 +70,8 @@ export function saveAfterExplanationToServer(submissionId: string, req: SaveAfte
   return requestJson<SaveAfterExplanationResponse>(studentApi.submission(submissionId), json('PATCH', req));
 }
 
-export function getStudentRecordsFromServer(userId: string) {
-  return requestJson<GetStudentRecordsResponse>(`${studentApi.records()}?userId=${encodeURIComponent(userId)}`);
+export function getStudentRecordsFromServer() {
+  return requestJson<GetStudentRecordsResponse>(studentApi.records());
 }
 
 export function recordDirectAnswerAttemptToServer(req: RecordDirectAnswerAttemptRequest) {
@@ -81,6 +82,7 @@ export function saveRetrievalToServer(req: SaveRetrievalRequest) {
   return requestJson<SaveRetrievalResponse>(studentApi.retrievals(), json('POST', req));
 }
 
-export function demoResetOnServer(req: DemoResetRequest) {
-  return requestJson<DemoResetResponse>(studentApi.demoReset(), json('POST', req));
+export function demoResetOnServer() {
+  const body: DemoResetRequest = {};
+  return requestJson<DemoResetResponse>(studentApi.demoReset(), json('POST', body));
 }

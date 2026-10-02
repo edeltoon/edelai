@@ -23,6 +23,7 @@ export async function getChallengeMock(challengeId: string): Promise<GetChalleng
 
 export async function submitChallengeMock(
   challengeId: string,
+  studentId: string,
   req: SubmitChallengeRequest,
 ): Promise<SubmitChallengeResponse> {
   const challenge = getChallengePublic(challengeId);
@@ -61,7 +62,7 @@ export async function submitChallengeMock(
   }
 
   const graded = buildGradedSubmission({
-    studentId: req.userId,
+    studentId,
     courseId: req.courseId,
     challengeId,
     conceptId: challenge.conceptId,
