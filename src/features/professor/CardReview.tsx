@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { professorApi } from './api';
 import { ProfessorShell } from './ProfessorShell';
-import { sampleCards } from './sample-cards';
 import type { ReviewCard } from '@/types/professor-cards';
 import { GenerateCardsForm } from './GenerateCardsForm';
 
+type StoredCard = ReviewCard & { updatedAt: string };
 type Status = ReviewCard['approvalStatus'];
 const labels: Record<Status, string> = { pending: '검토 대기', approved: '승인', rejected: '반려' };
 const badges: Record<Status, string> = {
@@ -15,17 +16,43 @@ const secondary = 'rounded-control border border-line-strong bg-page px-4 py-2 t
 const inputClass = 'w-full rounded-control border border-line-strong bg-page p-3 text-body leading-relaxed';
 
 export function CardReview() {
-  const [cards, setCards] = useState<ReviewCard[]>(sampleCards);
+  const [cards, setCards] = useState<StoredCard[]>([]);
   const [filter, setFilter] = useState<Status | 'all'>('all');
-  const [selected, setSelected] = useState(sampleCards[0].id);
+  const [selected, setSelected] = useState('');
   const [notice, setNotice] = useState('');
   const visible = cards.filter(card => filter === 'all' || card.approvalStatus === filter);
   const active = visible.find(card => card.id === selected) ?? visible[0];
 
-  function update(card: ReviewCard) {
-    setCards(current => current.map(item => item.id === card.id ? card : item));
-    setNotice(card.approvalStatus === 'approved' ? '카드를 승인했습니다. 현재 화면에만 반영되며 학생에게 배포되지는 않습니다.'
-      : card.approvalStatus === 'rejected' ? '반려 사유를 기록했습니다.' : '수정 내용을 반영하고 검토 대기로 변경했습니다.');
+  const [error,setError]=useState('');
+  const [busy,setBusy]=useState(false);
+  const lock=useRef(false);
+  const [pendingSave,setPendingSave]=useState<ReviewCard[]>([]);
+  const refresh=useCallback(async()=>{
+    if(lock.current)return;
+    lock.current=true;setBusy(true);setError('');
+    try{const r=await professorApi<{cards:StoredCard[]}>('cards');setCards(r.cards);}
+    catch(e){setError(e instanceof Error?e.message:'카드 조회 실패');}
+    finally{lock.current=false;setBusy(false);}
+  },[]);
+  useEffect(()=>{let active=true;queueMicrotask(()=>{if(active)void refresh();});return()=>{active=false;};},[refresh]);
+  async function saveGenerated(generated:ReviewCard[]){
+    if(lock.current)return;
+    lock.current=true;setBusy(true);setError('');setPendingSave(generated);
+    try{const r=await professorApi<{cards:StoredCard[]}>('cards','POST',{cards:generated});
+      setCards(current=>[...r.cards,...current.filter(c=>!r.cards.some(n=>n.id===c.id))]);setPendingSave([]);setFilter('all');setSelected(r.cards[0]?.id??'');setNotice('생성 카드를 Supabase에 저장했습니다. 승인 전에 근거를 확인하세요.');
+    }catch(e){setError(e instanceof Error?e.message:'저장 실패');}
+    finally{lock.current=false;setBusy(false);}
+  }
+  async function update(card:ReviewCard):Promise<boolean>{
+    if(lock.current)return false;
+    const current=cards.find(c=>c.id===card.id);if(!current)return false;
+    const edited=['wrongClaim','correctClaim','evidence'].some(k=>card[k as keyof ReviewCard]!==current[k as keyof ReviewCard]);
+    const action=edited?'edit':card.approvalStatus==='approved'?'approve':card.approvalStatus==='rejected'?'reject':'reset';
+    lock.current=true;setBusy(true);setError('');
+    try{const r=await professorApi<{card:StoredCard}>('cards/'+encodeURIComponent(card.id),'PATCH',{action,updatedAt:current.updatedAt,reviewed:action==='approve',reason:card.rejectionReason,wrongClaim:card.wrongClaim,correctClaim:card.correctClaim,evidence:card.evidence});
+      setCards(list=>list.map(c=>c.id===r.card.id?r.card:c));setNotice('변경 내용을 Supabase에 저장했습니다.');return true;
+    }catch(e){setError(e instanceof Error?e.message:'저장 실패');return false;}
+    finally{lock.current=false;setBusy(false);}
   }
 
   return (
@@ -36,19 +63,15 @@ export function CardReview() {
             <h2 className="text-(length:--text-page) font-bold">오류 카드 검토</h2>
             <p className="mt-2 text-body text-ink-sub">오류 주장과 정답 근거를 확인하고 챌린지에 사용할 카드를 검토하세요.</p>
           </div>
-          <button className={secondary} onClick={() => {
-            if (window.confirm('AI가 생성한 카드와 검토 내용을 지우고 샘플 카드로 되돌릴까요?')) {
-              setCards(sampleCards); setFilter('all'); setSelected(sampleCards[0].id); setNotice('샘플 카드를 초기화했습니다.');
-            }
-          }}>샘플로 초기화</button>
+          <button disabled={busy} className={secondary} onClick={refresh}>카드 새로 읽기</button>
         </div>
         <p className="mt-5 rounded-block border border-line bg-subtle px-4 py-3 text-caption text-ink-sub">
-          Claude 생성 카드와 샘플 카드를 구분해 표시합니다. 생성·검토 결과는 새로고침하면 초기화됩니다. 서버 저장과 학생 배포는 아직 연결되지 않았습니다.
+          카드와 검토 결과를 Supabase에 저장합니다. 기존 챌린지에 연결된 카드가 승인되면 학생 서버 API에서 조회할 수 있습니다. 새 생성 카드의 챌린지 연결은 별도 작업입니다.
         </p>
-        <GenerateCardsForm onGenerated={generated => {
-          setCards(current => [...generated, ...current]); setFilter('all'); setSelected(generated[0].id);
-          setNotice('생성된 카드를 검토 대기 목록에 추가했습니다.');
-        }} />
+        <fieldset disabled={busy || pendingSave.length>0}><GenerateCardsForm onGenerated={saveGenerated} /></fieldset>
+        {pendingSave.length>0 && <div className="mt-4 rounded-block bg-caution-bg p-4"><p>생성 카드 {pendingSave.length}개가 아직 저장되지 않았습니다. 재생성 없이 저장을 재시도할 수 있습니다. 이 화면을 떠나면 미저장 내용이 사라집니다.</p><button disabled={busy} onClick={()=>saveGenerated(pendingSave)} className={secondary}>생성 카드 저장 재시도</button></div>}
+        {error && <p role="alert" className="mt-4 rounded-control bg-wrong-bg p-3 text-wrong">{error}</p>}
+        {busy && <p role="status" className="mt-3 text-body">서버에 반영 중…</p>}
         <div role="status" aria-live="polite" className="mt-3 min-h-6 text-caption text-correct">{notice}</div>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           {(['pending', 'approved', 'rejected'] as const).map(status => (
@@ -87,7 +110,7 @@ export function CardReview() {
               {!visible.length && <p className="rounded-block border border-dashed border-line p-5 text-body text-ink-sub">{filter === 'all' ? '등록된' : labels[filter]} 카드가 없습니다. 전체 보기에서 다른 카드를 확인하세요.</p>}
             </section>
           </aside>
-          {active ? <ReviewPanel key={`${active.id}-${active.approvalStatus}`} card={active} onUpdate={update} /> : (
+          {active ? <fieldset disabled={busy} className="min-w-0"><ReviewPanel key={`${active.id}-${active.updatedAt}`} card={active} onUpdate={update} /></fieldset> : (
             <section className="rounded-block border border-line px-6 py-16 text-center">
               <h3 className="text-title font-bold">검토할 카드를 선택하세요</h3>
               <p className="mt-3 text-body text-ink-sub">다른 상태를 선택하거나 전체 목록을 확인할 수 있습니다.</p>
@@ -104,7 +127,7 @@ function StatusBadge({ status }: { status: Status }) {
   return <span className={`rounded-full px-2.5 py-1 text-caption font-semibold ${badges[status]}`}>{labels[status]}</span>;
 }
 
-function ReviewPanel({ card, onUpdate }: { card: ReviewCard; onUpdate: (card: ReviewCard) => void }) {
+function ReviewPanel({ card, onUpdate }: { card: ReviewCard; onUpdate: (card: ReviewCard) => Promise<boolean> }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(card);
   const [reviewed, setReviewed] = useState(false);
@@ -128,9 +151,9 @@ function ReviewPanel({ card, onUpdate }: { card: ReviewCard; onUpdate: (card: Re
               </label>
             ))}
             <p className="text-caption text-ink-sub">내용을 수정하면 기존 승인·반려 상태가 해제되어 다시 검토해야 합니다.</p>
-            <div className="flex flex-wrap gap-2"><button disabled={!canSave} className={secondary} onClick={() => {
-              onUpdate({ ...draft, wrongClaim: draft.wrongClaim.trim(), correctClaim: draft.correctClaim.trim(), evidence: draft.evidence.trim(), approvalStatus: 'pending', approvedBy: undefined, rejectionReason: undefined });
-              setReviewed(false); setEditing(false);
+            <div className="flex flex-wrap gap-2"><button disabled={!canSave} className={secondary} onClick={async () => {
+              const saved = await onUpdate({ ...draft, wrongClaim: draft.wrongClaim.trim(), correctClaim: draft.correctClaim.trim(), evidence: draft.evidence.trim(), approvalStatus: 'pending', approvedBy: undefined, rejectionReason: undefined });
+              if (saved) { setReviewed(false); setEditing(false); }
             }}>수정 내용 저장</button><button className={secondary} onClick={() => setEditing(false)}>수정 취소</button></div>
           </div>
         ) : (
@@ -151,10 +174,10 @@ function ReviewPanel({ card, onUpdate }: { card: ReviewCard; onUpdate: (card: Re
           <div className="mt-5 flex flex-wrap justify-end gap-2">
             {rejecting ? <><button className={secondary} onClick={() => setRejecting(false)}>반려 취소</button><button disabled={!reason.trim()} className={secondary} onClick={() => onUpdate({ ...card, approvalStatus: 'rejected', rejectionReason: reason.trim() })}>반려 사유 저장</button></> : <>
               <button className={secondary} onClick={() => setRejecting(true)}>반려하기</button>
-              <button disabled={!reviewed} className="rounded-control bg-sejong px-5 py-2 text-body font-semibold text-(--color-page) disabled:cursor-not-allowed disabled:opacity-40" onClick={() => onUpdate({ ...card, approvalStatus: 'approved', approvedBy: 'preview-professor' })}>카드 승인하기</button>
+              <button disabled={!reviewed} className="rounded-control bg-sejong px-5 py-2 text-body font-semibold text-(--color-page) disabled:cursor-not-allowed disabled:opacity-40" onClick={() => onUpdate({ ...card, approvalStatus: 'approved', approvedBy: 'p1' })}>카드 승인하기</button>
             </>}
           </div>
-        </> : <div className="flex flex-wrap items-center justify-between gap-4"><p className="text-body text-ink-sub">{card.approvalStatus === 'approved' ? '검토를 마친 카드입니다. 아직 서버에 저장되거나 배포되지 않았습니다.' : '반려된 카드입니다. 내용을 수정하면 다시 검토할 수 있습니다.'}</p><button className={secondary} onClick={() => onUpdate({ ...card, approvalStatus: 'pending', approvedBy: undefined, rejectionReason: undefined })}>다시 검토하기</button></div>}
+        </> : <div className="flex flex-wrap items-center justify-between gap-4"><p className="text-body text-ink-sub">{card.approvalStatus === 'approved' ? '승인 상태가 서버에 저장되었습니다. 이 카드에 연결된 챌린지의 공개 조건에 반영됩니다.' : '반려된 카드입니다. 내용을 수정하면 다시 검토할 수 있습니다.'}</p><button className={secondary} onClick={() => onUpdate({ ...card, approvalStatus: 'pending', approvedBy: undefined, rejectionReason: undefined })}>다시 검토하기</button></div>}
       </div>}
     </section>
   );

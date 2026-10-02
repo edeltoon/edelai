@@ -13,6 +13,8 @@ export async function proxy(request: NextRequest) {
     if (path.startsWith('/api/')) return NextResponse.json({ ok: false, error: { code: session ? 'FORBIDDEN' : 'UNAUTHORIZED', message: '로그인과 접근 권한을 확인해 주세요.' } }, { status: session ? 403 : 401, headers: { 'Cache-Control': 'no-store' } });
     return NextResponse.redirect(new URL('/', request.url));
   }
-  return NextResponse.next();
+  const response = NextResponse.next();
+  response.headers.set('Cache-Control', 'private, no-store');
+  return response;
 }
 export const config = { matcher: ['/professor/:path*', '/student/:path*', '/api/professor/:path*', '/api/chat', '/api/student/:path*'] };
