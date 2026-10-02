@@ -1,1 +1,98 @@
 @import "tailwindcss";
+
+/*
+ * 디자인 토큰. 값과 용도는 DESIGN.md 1~2장과 1:1로 맞춘다.
+ * 컴포넌트에서는 임의 hex 대신 이 토큰 클래스(bg-sejong, text-ink-sub ...)만 쓴다.
+ */
+@theme {
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+
+  /* 기본 면·선·글자 */
+  --color-page: #ffffff;
+  --color-sidebar: #fcfcfd;
+  --color-subtle: #f6f8f9;
+  --color-bubble: #eff2f4;
+  --color-line: #e0e6ec;
+  --color-line-soft: #eaeef2;
+  --color-line-strong: #d5dae0;
+  --color-ink: #263646;
+  --color-ink-sub: #66768a;
+
+  /* 브랜드·주 색 (세종 크림슨) */
+  --color-sejong: #ae1a3b;
+  --color-sejong-soft: #fbeff2;
+  --color-sejong-muted: #f2e6eb;
+
+  /* 정보·선택 (근거 칩, '맞다' 선택, 확신도 막대, 재인출 질문) */
+  --color-info: #366087;
+  --color-info-soft: #ebf2f9;
+  --color-info-bar: #6987a1;
+
+  /* 기존 LMS 계열 (교수 표·링크 등 보조) */
+  --color-slate: #314a5f;
+  --color-lms-blue: #308bc5;
+  --color-alert: #e5281f;
+
+  /* 검증 챌린지 전용 */
+  --color-challenge: #8f4f2a;
+  --color-challenge-bg: #fff4e8;
+  --color-challenge-border: #f2c26b;
+  --color-caution: #86684f;
+  --color-caution-bg: #f9f4ef;
+
+  /* 해설 공개 */
+  --color-correct: #3e7559;
+  --color-correct-bg: #edf6ef;
+  --color-wrong: #b42318;
+  --color-wrong-bg: #fdecea;
+
+  /* 타이포 스케일 (px): 13 보조 / 15 본문 / 17 강조 / 20 행 제목 / 28 페이지 제목 */
+  --text-caption: 13px;
+  --text-caption--line-height: 1.5;
+  --text-body: 15px;
+  --text-body--line-height: 1.6;
+  --text-lead: 17px;
+  --text-lead--line-height: 1.6;
+  --text-title: 20px;
+  --text-title--line-height: 1.3;
+  --text-page: 28px;
+  --text-page--line-height: 1.3;
+
+  /* 모서리: 입력·버튼·배지 6px, 블록·카드 8px, 상태 배지만 완전 둥글게(rounded-full) */
+  --radius-control: 6px;
+  --radius-block: 8px;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 숫자는 표 정렬용 고정폭 숫자 */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 키보드 포커스 링: 정보 파랑 2px */
+:focus-visible {
+  outline: 2px solid var(--color-info);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
