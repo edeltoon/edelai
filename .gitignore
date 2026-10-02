@@ -141,3 +141,9 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Next.js generated types and local deployment files
+next-env.d.ts
+.vercel/
+.DS_Store
+*.pem
