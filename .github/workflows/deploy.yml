@@ -1,0 +1,26 @@
+# 서버 API는 GitHub Pages에서 실행할 수 없습니다. 배포 환경 선정 전 검증만 수행합니다.
+name: Validate Next.js
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:api
+      - run: npm run lint
+      - run: npm run build
