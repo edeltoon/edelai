@@ -101,3 +101,24 @@ export function pastedReasonRatio(answers: readonly { reasoning: string; pastedC
   const pasted = answers.filter((a) => isPastedReason(a.reasoning.length, a.pastedChars)).length;
   return pasted / answers.length;
 }
+
+/**
+ * 해설 전 생각 요약(키워드 규칙용): 본인 생각의 첫 문장, 최대 max자.
+ * AI 요약이 없을 때(local mock, AI 채점 실패 대체) 쓴다.
+ * 예) '' → '', '이데아가 실재다. 그래서 틀렸다.' → '이데아가 실재다.', 61자 첫 문장 → 60자 + '…'
+ */
+export function firstSentenceSummary(text: string, max = 60): string {
+  const first = text.trim().split(/(?<=[.!?。])\s+|\n+/)[0]?.trim() ?? '';
+  return first.length > max ? `${first.slice(0, max)}…` : first;
+}
+
+/**
+ * 키워드 규칙으로 채점했을 때의 본인 생각 피드백 (해요체).
+ * 예) (2, false) → 개념 연결 칭찬, (0, false) → 20자·개념 연결 안내, (2, true) → 오탐 안내
+ */
+export function ruleReasonFeedback(score: number, falseAlarm: boolean): string {
+  if (falseAlarm) return '맞는 주장을 틀리다고 판정해서 이 주장의 이유 점수는 0이에요. 맞는 주장을 맞다고 인정하는 것도 실력이에요.';
+  if (score >= 2) return '수업 개념을 들어 판단 이유를 설명했어요.';
+  if (score === 1) return '이유는 썼지만 수업 개념과의 연결이 약해요.';
+  return '이유를 20자 이상, 수업 개념과 연결해 써 보세요.';
+}
