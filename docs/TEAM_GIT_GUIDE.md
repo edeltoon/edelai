@@ -1,3 +1,7 @@
+# 현재 사용 시 주의
+
+스타터 참고 자료입니다. 실제 Claude 호출과 서버 실행 기준은 `docs/ARCHITECTURE.md`, API 형식은 `docs/API.md`를 우선합니다. 목데이터·localStorage 흐름은 화면 개발용 예시이며 실제 서버 연동 완료가 아닙니다.
+
 # 팀원용 Git 작업 가이드 (Windows PowerShell 기준)
 
 ## 처음 한 번만
@@ -36,7 +40,7 @@ git switch -c feat/student-challenge
 
 # 3) 개발 서버 켜기 (터미널 하나는 이걸로 계속 켜둔다)
 npm run dev
-# → http://localhost:3000/edelai/  (localhost:3000/ 은 404가 정상)
+# → http://localhost:3000/
 
 # 4) 다른 터미널에서 Claude Code
 claude
@@ -66,9 +70,6 @@ git branch -d feat/student-challenge
 | `main`에서 작업해 버렸다 (아직 커밋 전) | `git switch -c feat/새이름` → 변경이 그대로 새 브랜치로 따라온다 |
 | push가 거절됨 (main 보호) | 정상. 브랜치로 올리고 PR을 만든다. 레포가 Private(무료)이면 보호가 안 걸리니 main 직접 push 금지는 약속으로 지킨다 |
 | PR에 충돌 표시 | `git fetch origin` → `git merge origin/main` → 충돌 파일 수정 → 커밋 → push. 남의 담당 파일이면 그 사람과 상의 |
-| `npm run dev` 했는데 404 | 주소가 `http://localhost:3000/edelai/`인지 확인 (basePath) |
-| `npm run build`에서 `generateStaticParams` 오류 | 동적 라우트(`[courseId]` 등)에 `generateStaticParams`가 빠졌거나 반환 id가 비어 있음. CLAUDE.md 정적 export 규칙 참고 |
+| `npm run dev` 했는데 404 | 주소가 `http://localhost:3000/`인지 확인 |
 | 하이드레이션 오류 (Hydration failed) | 렌더 중에 localStorage를 읽고 있음. `useEffect` 안으로 옮긴다 |
-| 배포 사이트가 안 바뀜 | 저장소 Actions 탭에서 실패 여부 확인, 성공 후 1~2분 기다리고 강력 새로고침(Ctrl+Shift+R). 주소는 https://edeltoon.github.io/edelai/ |
-| Pages 설정 메뉴가 막혀 있음 | 무료 organization의 Private 레포는 Pages 불가. 레포를 Public으로 전환해야 함 |
 | `claude` 명령을 못 찾음 | 터미널(VS Code 포함)을 완전히 껐다 켠다. 그래도 안 되면 설치 명령을 다시 실행하고 https://code.claude.com/docs/en/troubleshoot-install 참고 |
