@@ -11,3 +11,15 @@ export function validateDraft(input: { score: string; reason: string; feedback: 
   if (!input.reviewed) return { ok: false, message: '학생 제출 원문과 점수 근거를 확인해 주세요.' };
   return { ok: true, draft: { score, reason, feedback } };
 }
+
+/** 대기 항목만 보완하고 기존 규칙 점수를 보존한다. */
+export function completePending(parts: { judgment: number; reasoning: number | null; concept: number | null; evidence: number; penalty: number }, input: { reasoning: string; concept: string }) {
+  const filled = { ...parts };
+  for (const key of ['reasoning', 'concept'] as const) {
+    if (parts[key] !== null) continue;
+    const n = Number(input[key]);
+    if (!input[key].trim() || !Number.isInteger(n) || n < 0 || n > 2) return null;
+    filled[key] = n;
+  }
+  return { ...filled, total: Math.min(7, Math.max(0, filled.judgment + (filled.reasoning ?? 0) + (filled.concept ?? 0) + filled.evidence + filled.penalty)) };
+}
