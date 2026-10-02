@@ -5,6 +5,7 @@ import type { ClaimAnswer, ScoreBreakdown } from '../../../types/student-records
 export type SubmissionView = {
   id: string; challengeId: string; submittedAt: string; score: ScoreBreakdown;
   calibration: number; answers: ClaimAnswer[]; beforeSummary: string; afterExplanation?: string;
+  claimResults?: { claimId: string; judgmentCorrect: boolean }[];
   grader: 'mock' | 'server' | 'unknown';
 };
 export type ConversationView = { id: string; title: string; messages: { id: string; role: 'user' | 'ai' | 'notice'; text: string }[] };
@@ -47,7 +48,14 @@ export function loadRecords(storage: Pick<Storage, 'getItem'>): RecordsSnapshot 
         || !str(item.beforeSummary) || (item.afterExplanation !== undefined && !str(item.afterExplanation))) {
         warnings.push(`${id}: 형식이 맞지 않는 제출 기록을 제외했습니다.`); continue;
       }
-      submissions.push({ id: item.id, challengeId: item.challengeId, submittedAt: item.submittedAt,
+      let claimResults: SubmissionView['claimResults'];
+      if (item.claimGrades !== undefined) {
+        if (Array.isArray(item.claimGrades) && item.claimGrades.every(g => obj(g) && str(g.claimId) && typeof g.judgmentCorrect === 'boolean')
+          && new Set(item.claimGrades.map(g => g.claimId)).size === item.claimGrades.length) {
+          claimResults = item.claimGrades.map(g => ({ claimId: g.claimId, judgmentCorrect: g.judgmentCorrect }));
+        } else warnings.push(`${id}: 정오답 기록 형식이 맞지 않아 오답 집계에서 제외했습니다.`);
+      }
+      submissions.push({ claimResults, id: item.id, challengeId: item.challengeId, submittedAt: item.submittedAt,
         score: item.score, calibration: item.calibration, answers: item.answers, beforeSummary: item.beforeSummary,
         afterExplanation: item.afterExplanation as string | undefined,
         grader: item.grader === 'mock' || item.grader === 'server' ? item.grader : 'unknown' });

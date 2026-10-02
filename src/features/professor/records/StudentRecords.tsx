@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ProfessorShell } from '../ProfessorShell';
-import { loadRecords, type RecordsSnapshot, type SubmissionView } from './reader';
+import type { SubmissionView } from './reader';
+import { useRecords } from './useRecords';
 import { sampleStudents } from './sample';
 
 const button = 'rounded-control border border-line-strong bg-page px-4 py-2 text-body hover:bg-subtle';
@@ -11,25 +12,11 @@ const paragraph = 'whitespace-pre-wrap break-words text-body leading-relaxed';
 const scoreLabels = { judgment: '판정', reasoning: '이유', concept: '개념', evidence: '근거', penalty: '과정 감점' } as const;
 
 export function StudentRecords() {
-  const [snapshot, setSnapshot] = useState<RecordsSnapshot>({ students: [], warnings: [] });
-  const [loaded, setLoaded] = useState(false);
+  const { snapshot, loaded, refresh } = useRecords();
   const [sample, setSample] = useState(false);
   const [selected, setSelected] = useState('');
   const [query, setQuery] = useState('');
 
-  function refresh() {
-    try { setSnapshot(loadRecords(window.localStorage)); }
-    catch { setSnapshot({ students: [], warnings: ['브라우저 저장소 접근이 차단되어 기록을 읽을 수 없습니다.'] }); }
-    setLoaded(true);
-  }
-  useEffect(() => {
-    let mounted = true;
-    queueMicrotask(() => { if (mounted) refresh(); });
-    const onStorage = (event: StorageEvent) => { if (event.key === null || event.key.startsWith('edeltoon:')) refresh(); };
-    window.addEventListener('storage', onStorage);
-    window.addEventListener('edeltoon:store-change', refresh);
-    return () => { mounted = false; window.removeEventListener('storage', onStorage); window.removeEventListener('edeltoon:store-change', refresh); };
-  }, []);
   const students = sample ? sampleStudents : snapshot.students;
   const filtered = students.filter(student => student.id.toLowerCase().includes(query.trim().toLowerCase()));
   const current = filtered.find(student => student.id === selected) ?? filtered[0];
